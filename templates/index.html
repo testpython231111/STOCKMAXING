@@ -24,6 +24,24 @@
     --white:    #e8f5e8;
   }
 
+  [data-theme="light"] {
+    --bg:       #f4f7f4;
+    --bg2:      #ffffff;
+    --bg3:      #e8f0e8;
+    --border:   #c8d8c8;
+    --green:    #007a40;
+    --green2:   #009950;
+    --red:      #cc1144;
+    --yellow:   #b8860b;
+    --blue:     #0077aa;
+    --text:     #2a4a2a;
+    --text2:    #5a7a5a;
+    --text3:    #1a2e1a;
+    --white:    #0a0f0a;
+  }
+  [data-theme="light"] body::before { display: none; }
+  [data-theme="light"] .topbar { border-bottom: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
   * { margin:0; padding:0; box-sizing:border-box; }
 
   body {
@@ -374,6 +392,11 @@
   <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
     <div id="markedStatus" style="font-size:9px;letter-spacing:1px"></div>
     <div class="clock" id="clock">--:--:--</div>
+    <button onclick="toggleTheme()" id="themeBtn"
+      style="background:none;border:1px solid var(--border);color:var(--text2);
+             font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;
+             cursor:pointer;letter-spacing:1px;transition:all 0.2s"
+      title="Toggle light/dark mode">🌙 DARK</button>
   </div>
 </div>
 
@@ -448,13 +471,15 @@
       <div class="nav-item" onclick="visView('sammenlign')" id="nav-sammenlign">
         <span class="nav-icon">⚖</span> COMPARE
       </div>
+      <div class="nav-item" onclick="visView('sektorer')" id="nav-sektorer">
+        <span class="nav-icon">🏭</span> SECTORS
+      </div>
     </nav>
 
     <div style="margin-top:auto; font-size:9px; color:var(--text2); line-height:1.6">
       Data: Yahoo Finance<br>
       AI: Groq LLaMA 3.3 70B<br>
-      ⚠ Not financial advice<br>
-      Made by Sebastian Johnsen
+      ⚠ Not financial advice
     </div>
   </aside>
 
@@ -629,6 +654,32 @@
 
     </div>
 
+    <!-- SECTOR VIEW -->
+    <div id="view-sektorer" style="display:none; flex-direction:column; gap:14px">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">🏭 SECTOR PERFORMANCE</span>
+          <button class="btn" onclick="lastSektorer()" style="width:auto;padding:4px 12px;font-size:10px">↻ REFRESH</button>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:10px">
+            Based on sector ETFs (1-day performance). Click a sector to compare top holdings.
+          </div>
+          <div id="sektorGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+            <div style="color:var(--text2);font-size:11px;padding:20px;text-align:center;grid-column:1/-1">
+              Click ↻ REFRESH to load sector data
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="sektorDetalj" style="display:none">
+        <div class="panel-header">
+          <span class="panel-title" id="sektorDetaljTittel">SECTOR DETAIL</span>
+        </div>
+        <div class="panel-body" id="sektorDetaljBody"></div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -660,13 +711,14 @@ document.getElementById("groqKey").addEventListener("change", e => {
 
 // ── View switching ────────────────────────────────────────────────────────────
 function visView(navn) {
-  ["analyse","sammenlign","portefolje","watchlist"].forEach(v => {
+  ["analyse","sammenlign","portefolje","watchlist","sektorer"].forEach(v => {
     const el = document.getElementById("view-"+v);
     el.style.display = v===navn ? "flex" : "none";
     el.style.flexDirection = "column";
     document.getElementById("nav-"+v)?.classList.toggle("active", v===navn);
   });
   if (navn==="watchlist") oppdaterWatchlist();
+  if (navn==="sektorer")  lastSektorer();
 }
 // Show analysis by default
 document.getElementById("view-sammenlign").style.display = "none";
@@ -1446,7 +1498,142 @@ async function oppdaterWatchlist() {
 
 window.addEventListener("load", () => { tegnWatchlist(); });
 
-// ── Event listeners ───────────────────────────────────────────────────────────
+// ── Theme toggle ──────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+  const next = isLight ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next === "dark" ? "" : "light");
+  document.getElementById("themeBtn").textContent = next === "light" ? "🌙 DARK" : "☀ LIGHT";
+  localStorage.setItem("theme", next);
+}
+// Load saved theme
+(function() {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+    document.getElementById("themeBtn").textContent = "☀ LIGHT";
+  }
+})();
+
+// ── Sector overview ───────────────────────────────────────────────────────────
+const SEKTORER = [
+  { navn: "Technology",    etf: "XLK",  ikon: "💻", holdings: "AAPL,MSFT,NVDA,AVGO,META" },
+  { navn: "Healthcare",    etf: "XLV",  ikon: "🏥", holdings: "LLY,UNH,JNJ,ABBV,MRK" },
+  { navn: "Financials",    etf: "XLF",  ikon: "🏦", holdings: "BRK-B,JPM,V,MA,BAC" },
+  { navn: "Energy",        etf: "XLE",  ikon: "⚡", holdings: "XOM,CVX,COP,EOG,SLB" },
+  { navn: "Industrials",   etf: "XLI",  ikon: "🏗", holdings: "GE,RTX,CAT,HON,UNP" },
+  { navn: "Consumer Disc", etf: "XLY",  ikon: "🛒", holdings: "AMZN,TSLA,HD,MCD,NKE" },
+  { navn: "Consumer Stap", etf: "XLP",  ikon: "🛍", holdings: "PG,KO,PEP,COST,WMT" },
+  { navn: "Utilities",     etf: "XLU",  ikon: "💡", holdings: "NEE,DUK,SO,D,AEP" },
+  { navn: "Real Estate",   etf: "XLRE", ikon: "🏢", holdings: "PLD,AMT,EQIX,SPG,O" },
+  { navn: "Materials",     etf: "XLB",  ikon: "⛏", holdings: "LIN,SHW,APD,FCX,NEM" },
+  { navn: "Comm Services", etf: "XLC",  ikon: "📡", holdings: "META,GOOGL,NFLX,DIS,T" },
+];
+
+let sektorCache = null;
+
+async function lastSektorer() {
+  const grid = document.getElementById("sektorGrid");
+  grid.innerHTML = `<div style="color:var(--green2);font-size:11px;padding:20px;text-align:center;grid-column:1/-1">Loading sector data...</div>`;
+
+  try {
+    const etfs = SEKTORER.map(s => s.etf).join(",");
+    const res  = await fetch("/api/watchlist_kurs", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({tickers: SEKTORER.map(s => s.etf)})
+    });
+    const data = await res.json();
+    sektorCache = {};
+    data.forEach(d => { sektorCache[d.ticker] = d; });
+    tegnSektorer();
+  } catch(e) {
+    grid.innerHTML = `<div class="alert alert-error" style="grid-column:1/-1">Could not load sector data: ${e.message}</div>`;
+  }
+}
+
+function tegnSektorer() {
+  const grid = document.getElementById("sektorGrid");
+  if (!sektorCache) return;
+
+  // Sort by daily change
+  const sorted = [...SEKTORER].sort((a,b) => {
+    const da = sektorCache[a.etf]?.endring ?? 0;
+    const db = sektorCache[b.etf]?.endring ?? 0;
+    return db - da;
+  });
+
+  grid.innerHTML = sorted.map((s, i) => {
+    const d = sektorCache[s.etf];
+    const endring = d?.endring ?? 0;
+    const pris    = d?.pris ?? "—";
+    const cls     = endring >= 0 ? "var(--green)" : "var(--red)";
+    const pil     = endring >= 0 ? "▲" : "▼";
+    const rank    = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "";
+    const barW    = Math.min(Math.abs(endring) * 20, 100);
+    const barClr  = endring >= 0 ? "var(--green2)" : "var(--red)";
+
+    return `
+      <div onclick="visSektorDetalj('${s.navn}','${s.holdings}')"
+        style="background:var(--bg2);border:1px solid var(--border);padding:12px 14px;
+               cursor:pointer;transition:border-color 0.2s;border-radius:2px"
+        onmouseover="this.style.borderColor='var(--green)'"
+        onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text3)">${s.ikon} ${s.navn}</span>
+          <span style="font-size:9px;color:var(--text2)">${rank} ${s.etf}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <span style="font-size:15px;color:var(--text3);font-weight:500">${pris}</span>
+          <span style="font-size:13px;color:${cls};font-weight:500">${pil}${Math.abs(endring).toFixed(2)}%</span>
+        </div>
+        <div style="height:3px;background:var(--bg3);border-radius:2px">
+          <div style="height:100%;width:${barW}%;background:${barClr};border-radius:2px;transition:width 0.5s"></div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function visSektorDetalj(navn, holdings) {
+  document.getElementById("sektorDetalj").style.display = "flex";
+  document.getElementById("sektorDetaljTittel").textContent = navn + " — TOP HOLDINGS";
+  document.getElementById("sektorDetaljBody").innerHTML =
+    `<div style="color:var(--green2);font-size:11px">Loading ${navn} holdings...</div>`;
+
+  const tickers = holdings.split(",");
+  fetch("/api/watchlist_kurs", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({tickers})
+  })
+  .then(r => r.json())
+  .then(data => {
+    const rader = data.map(d => {
+      const cls = d.endring >= 0 ? "var(--green)" : "var(--red)";
+      const pil = d.endring >= 0 ? "▲" : "▼";
+      return `
+        <div onclick="analyserFraWatchlist('${d.ticker}')"
+          style="display:grid;grid-template-columns:80px 1fr 80px 80px;gap:8px;
+                 padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;
+                 align-items:center"
+          onmouseover="this.style.background='var(--bg3)'"
+          onmouseout="this.style.background=''">
+          <span style="color:var(--green);font-weight:500">${d.ticker}</span>
+          <span style="color:var(--text2);font-size:10px">${(d.navn||'').substring(0,28)}</span>
+          <span style="color:var(--text3);text-align:right">${d.pris}</span>
+          <span style="color:${cls};text-align:right">${pil}${Math.abs(d.endring).toFixed(2)}%</span>
+        </div>`;
+    }).join("");
+    document.getElementById("sektorDetaljBody").innerHTML =
+      `<div style="font-size:10px;color:var(--text2);margin-bottom:8px">Click a stock to analyze it</div>` + rader;
+  })
+  .catch(e => {
+    document.getElementById("sektorDetaljBody").innerHTML =
+      `<div class="alert alert-error">Could not load holdings: ${e.message}</div>`;
+  });
+}
+
+
 document.addEventListener("DOMContentLoaded", () => {
   const safe = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("keydown", fn); };
   safe("tickerInput", e => { if (e.key === "Enter") kjørAnalyse(false); });
