@@ -479,8 +479,7 @@
     <div style="margin-top:auto; font-size:9px; color:var(--text2); line-height:1.6">
       Data: Yahoo Finance<br>
       AI: Groq LLaMA 3.3 70B<br>
-      ⚠ Not financial advice<br>
-      Made by Sebastian Johnsen
+      ⚠ Not financial advice
     </div>
   </aside>
 
@@ -535,13 +534,31 @@
             <div class="tab" onclick="byttTab('risiko')">RISK</div>
             <div class="tab" onclick="byttTab('graf')">CHARTS</div>
             <div class="tab" onclick="byttTab('nyheter')" id="nyheterTab">NEWS</div>
+            <div class="tab" onclick="byttTab('earnings')" id="earningsTab">EARNINGS</div>
             <div class="tab" onclick="byttTab('ai')" id="aiTab" style="color:var(--yellow)">AI ANALYSIS</div>
           </div>
           <div class="tab-pane active" id="pane-teknisk"></div>
           <div class="tab-pane" id="pane-fundamental"></div>
           <div class="tab-pane" id="pane-risiko"></div>
-          <div class="tab-pane" id="pane-graf"></div>
+          <div class="tab-pane" id="pane-graf">
+            <!-- Chart sub-tabs -->
+            <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:0">
+              <div id="chartTab-tv" onclick="byttChartTab('tv')"
+                style="padding:8px 16px;font-size:10px;letter-spacing:1px;cursor:pointer;
+                       color:var(--green);border-bottom:2px solid var(--green)">
+                📈 TRADINGVIEW
+              </div>
+              <div id="chartTab-tech" onclick="byttChartTab('tech')"
+                style="padding:8px 16px;font-size:10px;letter-spacing:1px;cursor:pointer;
+                       color:var(--text2);border-bottom:2px solid transparent">
+                📊 TECHNICAL (MA/RSI/MACD)
+              </div>
+            </div>
+            <div id="chartPane-tv"></div>
+            <div id="chartPane-tech" style="display:none"></div>
+          </div>
           <div class="tab-pane" id="pane-nyheter"></div>
+          <div class="tab-pane" id="pane-earnings"></div>
           <div class="tab-pane" id="pane-ai"></div>
         </div>
 
@@ -730,6 +747,97 @@ function byttTab(navn) {
   document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
   event.target.classList.add("active");
   document.getElementById("pane-"+navn).classList.add("active");
+}
+
+function byttChartTab(type) {
+  const isTV = type === "tv";
+  document.getElementById("chartPane-tv").style.display   = isTV  ? "block" : "none";
+  document.getElementById("chartPane-tech").style.display = !isTV ? "block" : "none";
+  const tvTab   = document.getElementById("chartTab-tv");
+  const techTab = document.getElementById("chartTab-tech");
+  tvTab.style.color         = isTV  ? "var(--green)"  : "var(--text2)";
+  tvTab.style.borderBottom  = isTV  ? "2px solid var(--green)" : "2px solid transparent";
+  techTab.style.color        = !isTV ? "var(--green)"  : "var(--text2)";
+  techTab.style.borderBottom = !isTV ? "2px solid var(--green)" : "2px solid transparent";
+}
+
+async function lastEarnings(ticker) {
+  try {
+    const res  = await fetch("/api/earnings", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ticker})
+    });
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById("pane-earnings").innerHTML =
+        `<div class="alert alert-info" style="margin:10px">${data.error}</div>`;
+      return;
+    }
+
+    const next = data.next_earnings;
+    const hist = data.history || [];
+
+    let nextHtml = "";
+    if (next) {
+      const dager = Math.ceil((new Date(next.date) - new Date()) / 86400000);
+      const dagerTekst = dager > 0 ? `in ${dager} days` : dager === 0 ? "TODAY" : `${Math.abs(dager)} days ago`;
+      const urgency = dager <= 7 && dager >= 0 ? "var(--yellow)" : "var(--green)";
+      nextHtml = `
+        <div style="background:var(--bg3);border:1px solid var(--border);border-left:3px solid ${urgency};
+                    padding:14px 16px;margin-bottom:16px">
+          <div style="font-size:9px;color:var(--text2);letter-spacing:2px;margin-bottom:6px">NEXT EARNINGS REPORT</div>
+          <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
+            <span style="font-size:18px;color:var(--text3);font-weight:500">${next.date}</span>
+            <span style="font-size:12px;color:${urgency}">${dagerTekst}</span>
+            ${next.time ? `<span style="font-size:10px;color:var(--text2)">${next.time}</span>` : ""}
+            ${next.estimate ? `<span style="font-size:10px;color:var(--text2)">EPS est: <span style="color:var(--text3)">${next.estimate}</span></span>` : ""}
+          </div>
+        </div>`;
+    } else {
+      nextHtml = `<div style="color:var(--text2);font-size:11px;margin-bottom:16px">No upcoming earnings date found.</div>`;
+    }
+
+    let histHtml = "";
+    if (hist.length) {
+      const rows = hist.map(e => {
+        const beat = e.actual !== null && e.estimate !== null
+          ? e.actual >= e.estimate ? "var(--green)" : "var(--red)"
+          : "var(--text2)";
+        const diff = e.actual !== null && e.estimate !== null
+          ? ((e.actual - e.estimate) / Math.abs(e.estimate) * 100).toFixed(1)
+          : null;
+        return `
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:7px 10px;color:var(--text2)">${e.date}</td>
+            <td style="padding:7px 10px;color:var(--text3)">${e.actual ?? "—"}</td>
+            <td style="padding:7px 10px;color:var(--text2)">${e.estimate ?? "—"}</td>
+            <td style="padding:7px 10px;color:${beat}">${diff !== null ? (diff > 0 ? "▲" : "▼") + Math.abs(diff) + "%" : "—"}</td>
+            <td style="padding:7px 10px;color:${beat};font-size:10px">${e.actual !== null && e.estimate !== null ? (e.actual >= e.estimate ? "BEAT" : "MISS") : ""}</td>
+          </tr>`;
+      }).join("");
+      histHtml = `
+        <div style="font-size:9px;color:var(--text2);letter-spacing:2px;margin-bottom:8px">EARNINGS HISTORY (EPS)</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="padding:6px 10px;color:var(--text2);font-weight:400;text-align:left">DATE</th>
+              <th style="padding:6px 10px;color:var(--text2);font-weight:400;text-align:left">ACTUAL</th>
+              <th style="padding:6px 10px;color:var(--text2);font-weight:400;text-align:left">ESTIMATE</th>
+              <th style="padding:6px 10px;color:var(--text2);font-weight:400;text-align:left">SURPRISE</th>
+              <th style="padding:6px 10px;color:var(--text2);font-weight:400;text-align:left">RESULT</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    document.getElementById("pane-earnings").innerHTML = `
+      <div style="padding:14px">${nextHtml}${histHtml}</div>`;
+  } catch(e) {
+    document.getElementById("pane-earnings").innerHTML =
+      `<div class="alert alert-error" style="margin:10px">Could not load earnings: ${e.message}</div>`;
+  }
 }
 
 // ── Loader ────────────────────────────────────────────────────────────────────
@@ -950,10 +1058,14 @@ function visResultat(d) {
       </div>`;
   }
 
-  // ── Chart (TradingView) ──
+  // ── Charts (TradingView + Technical) ──
   const tvId = "tv_" + d.ticker.replace(/[^a-zA-Z0-9]/g,'_') + "_" + Date.now();
-  document.getElementById("pane-graf").innerHTML = `
-    <div style="height:520px">
+  window._currentTicker = d.ticker;
+  window._currentGraf   = d.graf;
+
+  // TradingView pane
+  document.getElementById("chartPane-tv").innerHTML = `
+    <div style="height:520px; padding:0">
       <div id="${tvId}" style="height:500px"></div>
       <div style="font-size:9px;color:var(--text2);padding:6px 4px;text-align:right">
         Powered by <a href="https://www.tradingview.com" target="_blank"
@@ -961,43 +1073,51 @@ function visResultat(d) {
       </div>
     </div>`;
 
-  // Small delay to ensure DOM is ready, then wait for TradingView lib
+  // Technical chart pane (matplotlib from backend)
+  document.getElementById("chartPane-tech").innerHTML = d.graf
+    ? `<div style="padding:10px">
+        <img src="${d.graf}" style="width:100%;border:1px solid var(--border)" alt="Technical chart">
+        <div style="font-size:9px;color:var(--text2);margin-top:6px">
+          MA20/50/200 · Bollinger Bands · MACD · RSI · Volume
+        </div>
+       </div>`
+    : `<div class="alert alert-info" style="margin:10px">Technical chart not available.</div>`;
+
+  // Load TradingView widget
   function lagChart(id, ticker) {
     if (window.TradingView) {
+      const isDark = document.documentElement.getAttribute("data-theme") !== "light";
       new TradingView.widget({
         "width":      "100%",
         "height":     500,
         "symbol":     ticker,
         "interval":   "D",
         "timezone":   "Europe/Oslo",
-        "theme":      "dark",
+        "theme":      isDark ? "dark" : "light",
         "style":      "1",
         "locale":     "en",
-        "backgroundColor": "#050a05",
-        "gridColor":  "rgba(26,46,26,0.5)",
+        "backgroundColor": isDark ? "#050a05" : "#f4f7f4",
+        "gridColor":  isDark ? "rgba(26,46,26,0.5)" : "rgba(200,216,200,0.5)",
         "hide_top_toolbar": false,
         "save_image": true,
         "studies": ["MASimple@tv-basicstudies","RSI@tv-basicstudies","MACD@tv-basicstudies"],
         "container_id": id
       });
     } else {
-      // Library not loaded yet, retry
       setTimeout(() => lagChart(id, ticker), 300);
     }
   }
-
-  setTimeout(() => {
-    try { lagChart(tvId, d.ticker); }
-    catch(e) {
-      document.getElementById("pane-graf").innerHTML =
-        `<div class="alert alert-info">Chart could not load. Try clicking the CHARTS tab again.</div>`;
-    }
-  }, 100);
+  setTimeout(() => { try { lagChart(tvId, d.ticker); } catch(e) {} }, 100);
 
   // ── Nyheter (last asynkront) ──
   document.getElementById("pane-nyheter").innerHTML =
     `<div style="color:var(--green2);font-size:11px;padding:10px">Fetching news...</div>`;
   lastNyheter(d.ticker);
+
+  // ── Earnings ──
+  document.getElementById("pane-earnings").innerHTML =
+    `<div style="color:var(--green2);font-size:11px;padding:10px">Fetching earnings data...</div>`;
+  lastEarnings(d.ticker);
 
   // ── AI ──
   if (d.ai) {
