@@ -345,6 +345,70 @@ def api_makro():
         except: rader.append({"navn":navn,"verdi":"N/A","endring":0})
     return jsonify(rader)
 
+@app.route("/api/earnings", methods=["POST"])
+def api_earnings():
+    ticker = request.json.get("ticker","").strip().upper()
+    if not ticker:
+        return jsonify({"error": "No ticker provided"}), 400
+    try:
+        aksje = yf.Ticker(ticker)
+
+        # Next earnings date
+        next_date  = None
+        next_time  = None
+        next_est   = None
+        try:
+            cal = aksje.calendar
+            if cal is not None:
+                if isinstance(cal, dict):
+                    ed = cal.get("Earnings Date")
+                    if ed:
+                        next_date = str(ed[0])[:10] if hasattr(ed, '__len__') else str(ed)[:10]
+                elif hasattr(cal, 'columns'):
+                    if "Earnings Date" in cal.columns:
+                        next_date = str(cal["Earnings Date"].iloc[0])[:10]
+                    elif "Earnings Date" in cal.index:
+                        next_date = str(cal.loc["Earnings Date"].iloc[0])[:10]
+        except: pass
+
+        # Earnings history
+        history = []
+        try:
+            ei = aksje.earnings_history
+            if ei is not None and not ei.empty:
+                ei = ei.sort_index(ascending=False).head(8)
+                for idx, row in ei.iterrows():
+                    actual   = round(float(row.get("epsActual",   row.get("Reported EPS", None))), 4) if row.get("epsActual",   row.get("Reported EPS", None)) is not None else None
+                    estimate = round(float(row.get("epsEstimate", row.get("EPS Estimate", None))), 4) if row.get("epsEstimate", row.get("EPS Estimate", None)) is not None else None
+                    try:
+                        actual   = None if (actual   is not None and (actual   != actual))   else actual
+                        estimate = None if (estimate is not None and (estimate != estimate)) else estimate
+                    except: pass
+                    history.append({
+                        "date":     str(idx)[:10],
+                        "actual":   actual,
+                        "estimate": estimate,
+                    })
+        except:
+            try:
+                ei = aksje.earnings_dates
+                if ei is not None and not ei.empty:
+                    ei = ei.dropna(how="all").head(8)
+                    for idx, row in ei.iterrows():
+                        actual   = float(row["Reported EPS"])  if "Reported EPS"  in row and row["Reported EPS"]  == row["Reported EPS"]  else None
+                        estimate = float(row["EPS Estimate"])  if "EPS Estimate"  in row and row["EPS Estimate"]  == row["EPS Estimate"]  else None
+                        history.append({"date": str(idx)[:10], "actual": actual, "estimate": estimate})
+            except: pass
+
+        return jsonify({
+            "next_earnings": {"date": next_date, "time": next_time, "estimate": next_est} if next_date else None,
+            "history": history
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
 @app.route("/api/sammenlign", methods=["POST"])
 def api_sammenlign():
     data     = request.json
