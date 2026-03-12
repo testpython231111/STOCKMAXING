@@ -392,6 +392,9 @@
       <div class="nav-item active" onclick="visView('analyse')" id="nav-analyse">
         <span class="nav-icon">📊</span> AKSJEANALYSE
       </div>
+      <div class="nav-item" onclick="visView('portefolje')" id="nav-portefolje">
+        <span class="nav-icon">💼</span> PORTEFØLJE
+      </div>
       <div class="nav-item" onclick="visView('makro')" id="nav-makro">
         <span class="nav-icon">🌍</span> MAKRO
       </div>
@@ -483,15 +486,81 @@
     </div>
 
     <!-- SAMMENLIGN VIEW -->
-    <div id="view-sammenlign" style="display:none">
+    <div id="view-sammenlign" style="display:none; flex-direction:column; gap:14px">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">⚖ FONDSSAMMENLIGNING</span>
+          <span class="panel-title">⚖ AKSJESAMMENLIGNING</span>
+          <span class="panel-badge" id="sammenlignStatus"></span>
         </div>
         <div class="panel-body" id="sammenlignBody">
           <div style="color:var(--text2); font-size:11px">Skriv inn tickers i søkepanelet og trykk Sammenlign.</div>
         </div>
       </div>
+    </div>
+
+    <!-- PORTEFØLJE VIEW -->
+    <div id="view-portefolje" style="display:none; flex-direction:column; gap:14px">
+
+      <!-- Legg til posisjon -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">💼 PORTEFØLJETRACKER</span>
+          <button class="btn" onclick="analyserPortefolje()" style="width:auto;padding:4px 14px;font-size:10px">
+            ⬡ AI-ANALYSER PORTEFØLJE
+          </button>
+        </div>
+        <div class="panel-body">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:8px; align-items:end">
+            <div class="input-group">
+              <label>TICKER</label>
+              <input type="text" id="pfTicker" placeholder="AAPL" style="width:100%">
+            </div>
+            <div class="input-group">
+              <label>ANTALL AKSJER</label>
+              <input type="text" id="pfAntall" placeholder="10" style="width:100%">
+            </div>
+            <div class="input-group">
+              <label>KJØPSPRIS (snitt)</label>
+              <input type="text" id="pfPris" placeholder="150.00" style="width:100%">
+            </div>
+            <button class="btn" onclick="leggTilPosisjon()" style="height:32px; white-space:nowrap">+ LEGG TIL</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Posisjoner -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">POSISJONER</span>
+          <div style="display:flex; gap:8px">
+            <button class="btn" onclick="oppdaterPortefolje()" style="width:auto;padding:4px 12px;font-size:10px">↻ OPPDATER KURSER</button>
+            <button class="btn" onclick="tømPortefolje()" style="width:auto;padding:4px 12px;font-size:10px;border-color:var(--red);color:var(--red)">✕ TØM</button>
+          </div>
+        </div>
+        <div id="pfTabell">
+          <div style="padding:20px; text-align:center; color:var(--text2); font-size:11px">
+            Ingen posisjoner lagt til ennå.
+          </div>
+        </div>
+        <div id="pfSummary" style="display:none; padding:12px 14px; border-top:1px solid var(--border); display:flex; gap:24px; flex-wrap:wrap"></div>
+      </div>
+
+      <!-- AI-analyse -->
+      <div class="panel" id="pfAIPanel" style="display:none">
+        <div class="panel-header">
+          <span class="panel-title" style="color:var(--yellow)">⬡ AI PORTEFØLJEANALYSE</span>
+        </div>
+        <div class="panel-body">
+          <div id="pfAITekst" class="ai-text"></div>
+        </div>
+      </div>
+
+      <!-- Sektorfordeling -->
+      <div class="panel" id="pfSektorPanel" style="display:none">
+        <div class="panel-header"><span class="panel-title">SEKTORFORDELING</span></div>
+        <div class="panel-body" id="pfSektorer"></div>
+      </div>
+
     </div>
 
   </main>
@@ -500,6 +569,7 @@
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 let sisteTicker = null;
+let portefolje  = [];
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 function oppdaterKlokke() {
@@ -512,6 +582,9 @@ setInterval(oppdaterKlokke, 1000); oppdaterKlokke();
 window.addEventListener("load", () => {
   const lagret = localStorage.getItem("groq_key");
   if (lagret) document.getElementById("groqKey").value = lagret;
+  // Last portefølje fra localStorage
+  const lagretPf = localStorage.getItem("portefolje");
+  if (lagretPf) { portefolje = JSON.parse(lagretPf); visPortefolje(); }
   lastMakro();
 });
 document.getElementById("groqKey").addEventListener("change", e => {
@@ -520,9 +593,10 @@ document.getElementById("groqKey").addEventListener("change", e => {
 
 // ── View switching ────────────────────────────────────────────────────────────
 function visView(navn) {
-  ["analyse","makro","sammenlign"].forEach(v => {
-    document.getElementById("view-"+v).style.display = v===navn ? "flex" : "none";
-    document.getElementById("view-"+v).style.flexDirection = "column";
+  ["analyse","makro","sammenlign","portefolje"].forEach(v => {
+    const el = document.getElementById("view-"+v);
+    el.style.display = v===navn ? "flex" : "none";
+    el.style.flexDirection = "column";
     document.getElementById("nav-"+v)?.classList.toggle("active", v===navn);
   });
   if (navn==="makro") lastMakro();
@@ -825,67 +899,301 @@ setInterval(lastMakro, 60000);
 
 // ── Sammenlign ────────────────────────────────────────────────────────────────
 async function kjørSammenlign() {
-  const input   = document.getElementById("compareInput").value.trim();
-  const periode = document.getElementById("periodeSelect").value;
-  const tickers = input.split(",").map(t => t.trim().toUpperCase()).filter(Boolean);
-  if (tickers.length < 2) {
-    alert("Skriv inn minst 2 tickers.");
-    return;
-  }
+  const input    = document.getElementById("compareInput").value.trim();
+  const periode  = document.getElementById("periodeSelect").value;
+  const groqKey  = document.getElementById("groqKey").value.trim();
+  const tickers  = input.split(",").map(t => t.trim().toUpperCase()).filter(Boolean);
+  if (tickers.length < 2) { alert("Skriv inn minst 2 tickers."); return; }
 
   visView("sammenlign");
+  document.getElementById("sammenlignStatus").textContent = "LASTER...";
   document.getElementById("sammenlignBody").innerHTML =
-    `<div style="color:var(--green2); font-size:11px">Henter data for ${tickers.join(", ")}...</div>`;
+    `<div style="color:var(--green2); padding:20px; font-size:11px; text-align:center">
+      Henter data for ${tickers.join(", ")}... (kan ta 30–60 sek)
+    </div>`;
 
   try {
     const res  = await fetch("/api/sammenlign", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({tickers, periode})
+      body: JSON.stringify({tickers, periode, groq_key: groqKey})
     });
     const data = await res.json();
+    const aksjer = data.aksjer || [];
 
-    if (!data.length) {
+    if (!aksjer.length) {
       document.getElementById("sammenlignBody").innerHTML =
         `<div class="alert alert-error">Ingen data hentet.</div>`;
       return;
     }
 
-    const bestSharp  = Math.max(...data.map(d => d.sharpe));
-    const worstSharp = Math.min(...data.map(d => d.sharpe));
+    document.getElementById("sammenlignStatus").textContent = `${aksjer.length} AKSJER`;
+
+    const bestSharp  = Math.max(...aksjer.map(d => d.sharpe));
+    const worstSharp = Math.min(...aksjer.map(d => d.sharpe));
+    const bestAvk    = Math.max(...aksjer.map(d => d.avk));
+
+    // Avkastning på perioder
+    const periodeTabell = aksjer.map(r => `
+      <tr>
+        <td style="color:var(--green);font-weight:500">${r.ticker}</td>
+        <td style="color:var(--text2);font-size:10px">${r.navn.substring(0,20)}</td>
+        <td style="color:var(--text2);font-size:10px">${r.sektor}</td>
+        <td class="${(r.avk_perioder['1M']||0)>=0?'pos':'neg'}">${r.avk_perioder['1M']!=null?(r.avk_perioder['1M']>=0?'+':'')+r.avk_perioder['1M']+'%':'N/A'}</td>
+        <td class="${(r.avk_perioder['3M']||0)>=0?'pos':'neg'}">${r.avk_perioder['3M']!=null?(r.avk_perioder['3M']>=0?'+':'')+r.avk_perioder['3M']+'%':'N/A'}</td>
+        <td class="${(r.avk_perioder['6M']||0)>=0?'pos':'neg'}">${r.avk_perioder['6M']!=null?(r.avk_perioder['6M']>=0?'+':'')+r.avk_perioder['6M']+'%':'N/A'}</td>
+        <td class="${r.avk>=0?'pos':'neg'}">${r.avk>=0?'+':''}${r.avk}%</td>
+        <td>${r.vol}%</td>
+        <td class="${r.sharpe===bestSharp?'pos':r.sharpe===worstSharp?'neg':''}">${r.sharpe}</td>
+        <td class="neg">${r.max_dd}%</td>
+        <td>${r.beta ?? 'N/A'}</td>
+      </tr>`).join("");
+
+    const fundamentTabell = aksjer.map(r => `
+      <tr>
+        <td style="color:var(--green);font-weight:500">${r.ticker}</td>
+        <td>${r.pris}</td>
+        <td>${r.mktcap}</td>
+        <td>${r.pe}</td>
+        <td>${r.forward_pe}</td>
+        <td>${r.roe}</td>
+        <td>${r.bruttomargin}</td>
+        <td>${r.driftsmargin}</td>
+        <td>${r.utbytte}</td>
+        <td>${r.mål}</td>
+        <td>${konsensusHtml(r.konsensus)}</td>
+      </tr>`).join("");
 
     document.getElementById("sammenlignBody").innerHTML = `
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>TICKER</th><th>AVKASTNING</th><th>VOLATILITET</th>
-            <th>SHARPE</th><th>MAX DRAWDOWN</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${data.map(r => `
-            <tr>
-              <td style="color:var(--green); font-weight:500">${r.ticker}</td>
-              <td class="${r.avk>=0?'pos':'neg'}">${r.avk>=0?'+':''}${r.avk}%</td>
-              <td>${r.vol}%</td>
-              <td class="${r.sharpe===bestSharp?'pos':r.sharpe===worstSharp?'neg':''}">${r.sharpe}</td>
-              <td class="neg">${r.max_dd}%</td>
-            </tr>`).join("")}
-        </tbody>
-      </table>
-      <div style="margin-top:10px; font-size:10px; color:var(--text2)">
-        <span style="color:var(--green)">Grønn Sharpe</span> = beste risikojustert avkastning &nbsp;|&nbsp;
-        <span style="color:var(--red)">Rød Sharpe</span> = svakeste
-      </div>`;
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px; color:var(--text2); letter-spacing:2px; margin-bottom:8px">AVKASTNING & RISIKO</div>
+        <div style="overflow-x:auto">
+          <table class="data-table" style="min-width:700px">
+            <thead><tr>
+              <th>TICKER</th><th>NAVN</th><th>SEKTOR</th>
+              <th>1M</th><th>3M</th><th>6M</th><th>1Y AVK</th>
+              <th>VOL</th><th>SHARPE</th><th>MAX DD</th><th>BETA</th>
+            </tr></thead>
+            <tbody>${periodeTabell}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px; color:var(--text2); letter-spacing:2px; margin-bottom:8px">FUNDAMENTAL SAMMENLIGNING</div>
+        <div style="overflow-x:auto">
+          <table class="data-table" style="min-width:800px">
+            <thead><tr>
+              <th>TICKER</th><th>PRIS</th><th>MKTCAP</th><th>P/E</th><th>FWD P/E</th>
+              <th>ROE</th><th>BRUTTOMARGIN</th><th>DRIFTSMARGIN</th>
+              <th>UTBYTTE</th><th>MÅL</th><th>KONSENSUS</th>
+            </tr></thead>
+            <tbody>${fundamentTabell}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="font-size:9px; color:var(--text2); margin-top:4px">
+        <span style="color:var(--green)">Grønn Sharpe</span> = best risikojustert &nbsp;|&nbsp;
+        <span style="color:var(--red)">Rød Sharpe</span> = svakest
+      </div>
+
+      ${data.ai ? `
+        <div style="margin-top:16px; padding:14px; background:var(--bg3); border:1px solid rgba(255,209,102,0.2)">
+          <div style="font-size:9px; color:var(--yellow); letter-spacing:2px; margin-bottom:10px">⬡ AI SAMMENLIGNING</div>
+          <div class="ai-text">${data.ai.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>
+        </div>` : ''}
+    `;
   } catch(e) {
     document.getElementById("sammenlignBody").innerHTML =
       `<div class="alert alert-error">Feil: ${e.message}</div>`;
   }
 }
 
+// ── Portefølje ────────────────────────────────────────────────────────────────
+function leggTilPosisjon() {
+  const ticker = document.getElementById("pfTicker").value.trim().toUpperCase();
+  const antall = parseFloat(document.getElementById("pfAntall").value);
+  const pris   = parseFloat(document.getElementById("pfPris").value);
+  if (!ticker || isNaN(antall) || isNaN(pris)) {
+    alert("Fyll inn ticker, antall og kjøpspris."); return;
+  }
+  const eksisterende = portefolje.find(p => p.ticker === ticker);
+  if (eksisterende) {
+    const totalAnt  = eksisterende.antall + antall;
+    const totalKost = eksisterende.antall*eksisterende.snittpris + antall*pris;
+    eksisterende.antall    = totalAnt;
+    eksisterende.snittpris = totalKost / totalAnt;
+  } else {
+    portefolje.push({ticker, antall, snittpris: pris});
+  }
+  localStorage.setItem("portefolje", JSON.stringify(portefolje));
+  document.getElementById("pfTicker").value = "";
+  document.getElementById("pfAntall").value = "";
+  document.getElementById("pfPris").value   = "";
+  visPortefolje();
+}
+
+function fjernPosisjon(ticker) {
+  portefolje = portefolje.filter(p => p.ticker !== ticker);
+  localStorage.setItem("portefolje", JSON.stringify(portefolje));
+  visPortefolje();
+}
+
+function tømPortefolje() {
+  if (!confirm("Tøm hele porteføljen?")) return;
+  portefolje = [];
+  localStorage.removeItem("portefolje");
+  visPortefolje();
+}
+
+function visPortefolje() {
+  if (!portefolje.length) {
+    document.getElementById("pfTabell").innerHTML =
+      `<div style="padding:20px; text-align:center; color:var(--text2); font-size:11px">Ingen posisjoner lagt til ennå.</div>`;
+    document.getElementById("pfSummary").style.display = "none";
+    return;
+  }
+  const rader = portefolje.map(p => `
+    <tr>
+      <td style="color:var(--green);font-weight:500">${p.ticker}</td>
+      <td>${p.antall}</td>
+      <td>${p.snittpris.toFixed(2)}</td>
+      <td style="color:var(--text2)">—</td>
+      <td style="color:var(--text2)">—</td>
+      <td style="color:var(--text2)">—</td>
+      <td>
+        <button onclick="fjernPosisjon('${p.ticker}')"
+          style="background:none;border:1px solid var(--red);color:var(--red);
+                 font-size:9px;padding:2px 6px;cursor:pointer;font-family:inherit">✕</button>
+      </td>
+    </tr>`).join("");
+  document.getElementById("pfTabell").innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="data-table" style="min-width:600px">
+        <thead><tr>
+          <th>TICKER</th><th>ANTALL</th><th>SNITTPRIS</th>
+          <th>NÅPRIS</th><th>GEVINST</th><th>%</th><th></th>
+        </tr></thead>
+        <tbody>${rader}</tbody>
+      </table>
+    </div>`;
+}
+
+async function oppdaterPortefolje() {
+  if (!portefolje.length) return;
+  document.getElementById("pfTabell").innerHTML =
+    `<div style="padding:20px; text-align:center; color:var(--green2); font-size:11px">Henter kurser...</div>`;
+  await analyserPortefoljeData(false);
+}
+
+async function analyserPortefolje() {
+  if (!portefolje.length) { alert("Ingen posisjoner å analysere."); return; }
+  await analyserPortefoljeData(true);
+}
+
+async function analyserPortefoljeData(medAI) {
+  const groqKey = document.getElementById("groqKey").value.trim();
+  try {
+    const res = await fetch("/api/portefolje_analyse", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({posisjoner: portefolje, groq_key: medAI ? groqKey : ""})
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+
+    // Oppdater tabell med live data
+    const rader = data.posisjoner.map(p => {
+      if (p.feil) return `<tr><td style="color:var(--red)">${p.ticker}</td><td colspan="6" style="color:var(--red)">${p.feil}</td></tr>`;
+      const gcls = p.pst >= 0 ? "pos" : "neg";
+      return `
+        <tr>
+          <td style="color:var(--green);font-weight:500">${p.ticker}<br>
+            <span style="font-size:9px;color:var(--text2)">${(p.navn||'').substring(0,16)}</span></td>
+          <td>${p.antall}</td>
+          <td>${p.snittpris.toFixed(2)}</td>
+          <td style="color:var(--text3)">${p.nåpris}</td>
+          <td class="${gcls}">${p.gevinst>=0?'+':''}${p.gevinst.toFixed(2)}</td>
+          <td class="${gcls}">${p.pst>=0?'+':''}${p.pst.toFixed(2)}%</td>
+          <td>
+            <button onclick="fjernPosisjon('${p.ticker}')"
+              style="background:none;border:1px solid var(--red);color:var(--red);
+                     font-size:9px;padding:2px 6px;cursor:pointer;font-family:inherit">✕</button>
+          </td>
+        </tr>`;
+    }).join("");
+
+    document.getElementById("pfTabell").innerHTML = `
+      <div style="overflow-x:auto">
+        <table class="data-table" style="min-width:600px">
+          <thead><tr>
+            <th>TICKER</th><th>ANTALL</th><th>SNITTPRIS</th>
+            <th>NÅPRIS</th><th>GEVINST</th><th>%</th><th></th>
+          </tr></thead>
+          <tbody>${rader}</tbody>
+        </table>
+      </div>`;
+
+    // Summary
+    const gcls = data.total_gevinst >= 0 ? "pos" : "neg";
+    document.getElementById("pfSummary").style.display = "flex";
+    document.getElementById("pfSummary").innerHTML = `
+      <div><span style="color:var(--text2);font-size:9px">TOTAL VERDI</span><br>
+        <span style="color:var(--text3);font-size:16px">${data.total_verdi.toFixed(2)}</span></div>
+      <div><span style="color:var(--text2);font-size:9px">INVESTERT</span><br>
+        <span style="color:var(--text3);font-size:16px">${data.total_kostnad.toFixed(2)}</span></div>
+      <div><span style="color:var(--text2);font-size:9px">TOTAL GEVINST</span><br>
+        <span class="${gcls}" style="font-size:16px">${data.total_gevinst>=0?'+':''}${data.total_gevinst.toFixed(2)}</span></div>
+      <div><span style="color:var(--text2);font-size:9px">AVKASTNING</span><br>
+        <span class="${gcls}" style="font-size:16px">${data.total_pst>=0?'+':''}${data.total_pst.toFixed(2)}%</span></div>`;
+
+    // Sektorfordeling
+    if (data.sektorer && Object.keys(data.sektorer).length) {
+      const total = Object.values(data.sektorer).reduce((a,b)=>a+b,0);
+      document.getElementById("pfSektorPanel").style.display = "block";
+      document.getElementById("pfSektorer").innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:6px">
+          ${Object.entries(data.sektorer).sort((a,b)=>b[1]-a[1]).map(([s,v]) => {
+            const pst = (v/total*100).toFixed(1);
+            return `
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                  <span style="font-size:10px;color:var(--text3)">${s}</span>
+                  <span style="font-size:10px;color:var(--green)">${pst}%</span>
+                </div>
+                <div style="background:var(--border);height:4px;border-radius:2px">
+                  <div style="background:var(--green2);height:4px;border-radius:2px;width:${pst}%"></div>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>`;
+    }
+
+    // AI
+    if (data.ai) {
+      document.getElementById("pfAIPanel").style.display = "block";
+      document.getElementById("pfAITekst").innerHTML =
+        data.ai.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+    }
+
+  } catch(e) {
+    alert("Feil: " + e.message);
+  }
+}
+
 // ── Enter-tast ────────────────────────────────────────────────────────────────
 document.getElementById("tickerInput").addEventListener("keydown", e => {
   if (e.key === "Enter") kjørAnalyse(false);
+});
+document.getElementById("pfTicker").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("pfAntall").focus();
+});
+document.getElementById("pfAntall").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("pfPris").focus();
+});
+document.getElementById("pfPris").addEventListener("keydown", e => {
+  if (e.key === "Enter") leggTilPosisjon();
 });
 </script>
 </body>
