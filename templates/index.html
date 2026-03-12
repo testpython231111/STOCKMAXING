@@ -6,7 +6,7 @@
 <title>STOCK ANALYSIS PRO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
-<script src="https://s3.tradingview.com/tv.js" id="tv-script"></script>
+<script src="https://s3.tradingview.com/tv.js" id="tv-script" async></script>
 <style>
   :root {
     --bg:       #050a05;
@@ -650,7 +650,8 @@ window.addEventListener("load", () => {
   // Last portefølje fra localStorage
   const lagretPf = localStorage.getItem("portefolje");
   if (lagretPf) { portefolje = JSON.parse(lagretPf); visPortefolje(); }
-  lastMakro();
+  // Delay macro fetch so page renders immediately
+  setTimeout(lastMakro, 1500);
 });
 document.getElementById("groqKey").addEventListener("change", e => {
   localStorage.setItem("groq_key", e.target.value);
@@ -907,13 +908,13 @@ function visResultat(d) {
       </div>
     </div>`;
 
-  // Small delay to ensure DOM is ready
-  setTimeout(() => {
-    try {
+  // Small delay to ensure DOM is ready, then wait for TradingView lib
+  function lagChart(id, ticker) {
+    if (window.TradingView) {
       new TradingView.widget({
         "width":      "100%",
         "height":     500,
-        "symbol":     d.ticker,
+        "symbol":     ticker,
         "interval":   "D",
         "timezone":   "Europe/Oslo",
         "theme":      "dark",
@@ -922,12 +923,19 @@ function visResultat(d) {
         "backgroundColor": "#050a05",
         "gridColor":  "rgba(26,46,26,0.5)",
         "hide_top_toolbar": false,
-        "hide_legend": false,
         "save_image": true,
         "studies": ["MASimple@tv-basicstudies","RSI@tv-basicstudies","MACD@tv-basicstudies"],
-        "container_id": tvId
+        "container_id": id
       });
-    } catch(e) {
+    } else {
+      // Library not loaded yet, retry
+      setTimeout(() => lagChart(id, ticker), 300);
+    }
+  }
+
+  setTimeout(() => {
+    try { lagChart(tvId, d.ticker); }
+    catch(e) {
       document.getElementById("pane-graf").innerHTML =
         `<div class="alert alert-info">Chart could not load. Try clicking the CHARTS tab again.</div>`;
     }
@@ -968,7 +976,10 @@ function visResultat(d) {
 // ── Makro (kun topplinje) ─────────────────────────────────────────────────────
 async function lastMakro() {
   try {
-    const res  = await fetch("/api/makro");
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const res  = await fetch("/api/makro", {signal: controller.signal});
+    clearTimeout(tid);
     const data = await res.json();
 
     // Market status (US market open 14:30–21:00 Norwegian time)
