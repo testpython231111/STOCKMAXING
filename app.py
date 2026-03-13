@@ -294,24 +294,73 @@ def api_analyse():
         "konsensus":  info.get("recommendationKey","N/A").upper(),
     }
 
-    # AI analysis
-    ai_tekst = ""
-    if data.get("ai", False):
-        # Fetch extra data for richer AI context
+    return jsonify({
+        "ticker":       ticker,
+        "fundamental":  fundamental,
+        "signaler":     sig,
+        "risiko":       ri,
+        "graf":         graf,
+        "historikk":    historikk,
+        "ai":           "",
+    })
+
+@app.route("/api/ai_analyse", methods=["POST"])
+def api_ai_analyse():
+    data     = request.json
+    ticker   = data.get("ticker","").strip().upper()
+    periode  = data.get("periode","1y")
+    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
+
+    if not ticker:
+        return jsonify({"error": "No ticker"}), 400
+    if not groq_key:
+        return jsonify({"error": "No API key configured"}), 400
+
+    try:
+        aksje = yf.Ticker(ticker)
+        df    = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
+        if df.empty:
+            return jsonify({"error": f"No data for {ticker}"}), 404
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        info = aksje.info
+        df   = beregn_tekniske(df)
+        sig  = hent_signaler(df)
+
+        bm_df = df.copy()
+        for bm in [BENCHMARK, "^GSPC"]:
+            try:
+                _bm = yf.download(bm, period=periode, progress=False, auto_adjust=True)
+                if not _bm.empty:
+                    if isinstance(_bm.columns, pd.MultiIndex): _bm.columns = _bm.columns.get_level_values(0)
+                    bm_df = _bm; break
+            except: pass
+        ri = beregn_risiko(df, bm_df)
+
+        fundamental = {
+            "pe":           safe(info.get("trailingPE")),
+            "forward_pe":   safe(info.get("forwardPE")),
+            "mktcap":       stor_tall(info.get("marketCap")),
+            "roe":          safe(info.get("returnOnEquity"), pst=True),
+            "driftsmargin": safe(info.get("operatingMargins"), pst=True),
+            "konsensus":    info.get("recommendationKey","N/A").upper(),
+            "navn":         info.get("longName", ticker),
+        }
+
         analyst_ctx = ""
         try:
-            target_mean  = info.get("targetMeanPrice")
-            target_high  = info.get("targetHighPrice")
-            target_low   = info.get("targetLowPrice")
-            cur_price    = info.get("currentPrice") or info.get("regularMarketPrice")
-            upside       = round((target_mean - cur_price) / cur_price * 100, 1) if target_mean and cur_price else None
-            n_analysts   = info.get("numberOfAnalystOpinions", 0)
-            strong_buy   = info.get("numberOfStrongBuyOpinions", 0) or info.get("strongBuy", 0)
-            buy          = info.get("numberOfBuyOpinions", 0) or info.get("buy", 0)
-            hold         = info.get("numberOfHoldOpinions", 0) or info.get("hold", 0)
-            sell         = info.get("numberOfSellOpinions", 0) or info.get("sell", 0)
-            strong_sell  = info.get("numberOfStrongSellOpinions", 0) or info.get("strongSell", 0)
-            analyst_ctx  = f"Analyst consensus: {n_analysts} analysts — StrongBuy={strong_buy}, Buy={buy}, Hold={hold}, Sell={sell}, StrongSell={strong_sell}. Price targets: Low={target_low}, Mean={target_mean}, High={target_high}. Upside to mean target: {upside}%."
+            target_mean = info.get("targetMeanPrice")
+            target_high = info.get("targetHighPrice")
+            target_low  = info.get("targetLowPrice")
+            cur_price   = info.get("currentPrice") or info.get("regularMarketPrice")
+            upside      = round((target_mean - cur_price) / cur_price * 100, 1) if target_mean and cur_price else None
+            n_analysts  = info.get("numberOfAnalystOpinions", 0)
+            strong_buy  = info.get("numberOfStrongBuyOpinions", 0) or info.get("strongBuy", 0)
+            buy         = info.get("numberOfBuyOpinions", 0) or info.get("buy", 0)
+            hold        = info.get("numberOfHoldOpinions", 0) or info.get("hold", 0)
+            sell        = info.get("numberOfSellOpinions", 0) or info.get("sell", 0)
+            strong_sell = info.get("numberOfStrongSellOpinions", 0) or info.get("strongSell", 0)
+            analyst_ctx = f"Analyst consensus: {n_analysts} analysts — StrongBuy={strong_buy}, Buy={buy}, Hold={hold}, Sell={sell}, StrongSell={strong_sell}. Price targets: Low={target_low}, Mean={target_mean}, High={target_high}. Upside to mean target: {upside}%."
         except: pass
 
         insider_ctx = ""
@@ -338,8 +387,7 @@ def api_analyse():
                         earnings_ctx = f"Next earnings: {next_ed}."
             ei = aksje.earnings_history
             if ei is not None and not ei.empty:
-                beats = 0
-                misses = 0
+                beats = misses = 0
                 for _, r in ei.head(4).iterrows():
                     actual = r.get("epsActual") or r.get("Reported EPS")
                     est    = r.get("epsEstimate") or r.get("EPS Estimate")
@@ -366,23 +414,17 @@ Provide a structured analysis:
 1. **Overall Assessment** (2-3 sentences combining all signals)
 2. **Key Strengths** (3 bullet points)
 3. **Key Risks** (3 bullet points)
-4. **What Insiders & Analysts Signal** (1-2 sentences interpreting insider activity and analyst consensus)
+4. **What Insiders & Analysts Signal** (1-2 sentences)
 5. **Technical Timing** (1-2 sentences)
 6. **Verdict: BUY / HOLD / SELL** with one-line justification
 
 Max 280 words. Be direct, specific, and integrate all available data.
 """
         ai_tekst = spør_groq(prompt, groq_key, 1500)
+        return jsonify({"ai": ai_tekst})
 
-    return jsonify({
-        "ticker":       ticker,
-        "fundamental":  fundamental,
-        "signaler":     sig,
-        "risiko":       ri,
-        "graf":         graf,
-        "historikk":    historikk,
-        "ai":           ai_tekst,
-    })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/makro", methods=["GET"])
 def api_makro():
