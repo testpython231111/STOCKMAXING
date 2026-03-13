@@ -545,8 +545,6 @@
 
     <hr class="divider">
 
-    <hr class="divider">
-
     <nav>
       <div class="nav-item active" onclick="visView('analyse')" id="nav-analyse">
         <span class="nav-icon">📊</span> STOCK ANALYSIS
@@ -589,22 +587,78 @@
       <!-- Velkommen -->
       <div id="welcome" class="panel">
         <div class="panel-header">
-          <span class="panel-title">WELCOME</span>
+          <span class="panel-title">STOCK ANALYSIS PRO</span>
+          <span class="panel-badge">POWERED BY AI</span>
         </div>
         <div class="panel-body">
-          <div style="text-align:center; padding:30px 0">
-            <div style="font-size:32px; margin-bottom:12px">📈</div>
-            <div style="font-size:16px; color:var(--text3); font-family:'IBM Plex Sans',sans-serif; margin-bottom:8px">
-              Stock Analysis PRO
+          <div style="padding:10px 0 24px">
+
+            <!-- Headline -->
+            <div style="text-align:center; margin-bottom:28px">
+              <div style="font-size:11px; color:var(--text2); letter-spacing:3px; margin-bottom:10px">TERMINAL</div>
+              <div style="font-size:22px; color:var(--green); font-family:'IBM Plex Sans',sans-serif; font-weight:600; margin-bottom:8px">
+                Professional Stock Analysis
+              </div>
+              <div style="font-size:11px; color:var(--text2); line-height:1.8">
+                Enter a ticker and press <span style="color:var(--green); border:1px solid var(--green2); padding:1px 6px">▶ ANALYZE</span> to get started
+              </div>
+              <div style="margin-top:12px; font-size:11px; color:var(--text2)">
+                Try:
+                <span onclick="document.getElementById('tickerInput').value='AAPL'; kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 6px">AAPL</span>
+                <span onclick="document.getElementById('tickerInput').value='EQNR.OL'; kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 6px">EQNR.OL</span>
+                <span onclick="document.getElementById('tickerInput').value='TSLA'; kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 6px">TSLA</span>
+                <span onclick="document.getElementById('tickerInput').value='NVDA'; kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 6px">NVDA</span>
+              </div>
             </div>
-            <div style="font-size:11px; color:var(--text2); line-height:1.8">
-              Enter a ticker symbol in the search panel on the left<br>
-              and press ANALYZE to get started<br><br>
-              Examples: <span style="color:var(--green)">AAPL</span> &nbsp;
-              <span style="color:var(--green)">EQNR.OL</span> &nbsp;
-              <span style="color:var(--green)">TSLA</span> &nbsp;
-              <span style="color:var(--green)">DNB.OL</span>
+
+            <!-- Feature grid -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:1px; background:var(--border)">
+
+              <div style="background:var(--bg2); padding:16px 14px">
+                <div style="font-size:16px; margin-bottom:8px">📊</div>
+                <div style="font-size:10px; color:var(--green2); letter-spacing:1px; margin-bottom:4px">TECHNICAL</div>
+                <div style="font-size:10px; color:var(--text2); line-height:1.6">RSI, MACD, Bollinger Bands, moving averages, volume analysis</div>
+              </div>
+
+              <div style="background:var(--bg2); padding:16px 14px">
+                <div style="font-size:16px; margin-bottom:8px">💰</div>
+                <div style="font-size:10px; color:var(--green2); letter-spacing:1px; margin-bottom:4px">FUNDAMENTAL</div>
+                <div style="font-size:10px; color:var(--text2); line-height:1.6">P/E, EV/EBITDA, margins, revenue growth, balance sheet</div>
+              </div>
+
+              <div style="background:var(--bg2); padding:16px 14px">
+                <div style="font-size:16px; margin-bottom:8px">⚠️</div>
+                <div style="font-size:10px; color:var(--green2); letter-spacing:1px; margin-bottom:4px">RISK</div>
+                <div style="font-size:10px; color:var(--text2); line-height:1.6">Beta, Sharpe ratio, Value at Risk, drawdown analysis</div>
+              </div>
+
+              <div style="background:var(--bg2); padding:16px 14px">
+                <div style="font-size:16px; margin-bottom:8px">🏦</div>
+                <div style="font-size:10px; color:var(--green2); letter-spacing:1px; margin-bottom:4px">ANALYSTS</div>
+                <div style="font-size:10px; color:var(--text2); line-height:1.6">Wall Street consensus, price targets, upgrades & downgrades</div>
+              </div>
+
+              <div style="background:var(--bg2); padding:16px 14px">
+                <div style="font-size:16px; margin-bottom:8px">🔍</div>
+                <div style="font-size:10px; color:var(--green2); letter-spacing:1px; margin-bottom:4px">INSIDER</div>
+                <div style="font-size:10px; color:var(--text2); line-height:1.6">SEC Form 4 filings — what executives are buying and selling</div>
+              </div>
+
+              <div style="background:var(--bg2); padding:16px 14px">
+                <div style="font-size:16px; margin-bottom:8px">🤖</div>
+                <div style="font-size:10px; color:var(--green2); letter-spacing:1px; margin-bottom:4px">AI ANALYSIS</div>
+                <div style="font-size:10px; color:var(--text2); line-height:1.6">LLaMA 3.3 70B synthesis of all data — bull case, risks, verdict</div>
+              </div>
+
             </div>
+
+            <!-- Bottom note -->
+            <div style="display:flex; justify-content:center; gap:24px; margin-top:20px; font-size:9px; color:var(--text2); letter-spacing:1px">
+              <span>DATA: YAHOO FINANCE</span>
+              <span>AI: GROQ LLAMA 3.3 70B</span>
+              <span>NOT FINANCIAL ADVICE</span>
+            </div>
+
           </div>
         </div>
       </div>
@@ -626,7 +680,7 @@
             <div class="tab" onclick="byttTab('earnings')" id="earningsTab">EARNINGS</div>
             <div class="tab" onclick="byttTab('analyst')" id="analystTab">ANALYSTS</div>
             <div class="tab" onclick="byttTab('insider')" id="insiderTab">INSIDER</div>
-            <div class="tab" onclick="byttTab('ai')" id="aiTab" style="color:var(--yellow)">AI ANALYSIS</div>
+            <div class="tab" onclick="byttTab('ai')" id="aiTab">AI ANALYSIS</div>
           </div>
           <div class="tab-pane active" id="pane-teknisk"></div>
           <div class="tab-pane" id="pane-fundamental"></div>
