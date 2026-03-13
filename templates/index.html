@@ -546,16 +546,6 @@
 
     <hr class="divider">
 
-    <div class="key-section">
-      <div class="sidebar-section" style="color:var(--yellow)">GROQ API KEY</div>
-      <div class="input-group">
-        <input type="text" id="groqKey" placeholder="gsk_…" style="border-color:rgba(255,209,102,0.3); color:var(--yellow)" />
-      </div>
-      <div style="margin-top:6px; font-size:9px; color:var(--text2)">
-        Free at console.groq.com/keys<br>Stored in browser only
-      </div>
-    </div>
-
     <hr class="divider">
 
     <nav>
@@ -817,18 +807,12 @@ function oppdaterKlokke() {
 }
 setInterval(oppdaterKlokke, 1000); oppdaterKlokke();
 
-// ── Groq key persistence ──────────────────────────────────────────────────────
 window.addEventListener("load", () => {
-  const lagret = localStorage.getItem("groq_key");
-  if (lagret) document.getElementById("groqKey").value = lagret;
   // Last portefølje fra localStorage
   const lagretPf = localStorage.getItem("portefolje");
   if (lagretPf) { portefolje = JSON.parse(lagretPf); visPortefolje(); }
   // Delay macro fetch so page renders immediately
   setTimeout(lastMakro, 1500);
-});
-document.getElementById("groqKey").addEventListener("change", e => {
-  localStorage.setItem("groq_key", e.target.value);
 });
 
 // ── View switching ────────────────────────────────────────────────────────────
@@ -981,7 +965,7 @@ function signalBull(ok, tekst) {
 async function kjørAnalyse(medAI) {
   const ticker  = document.getElementById("tickerInput").value.trim().toUpperCase();
   const periode = document.getElementById("periodeSelect").value;
-  const groqKey = document.getElementById("groqKey").value.trim();
+  const groqKey = "";
   if (!ticker) return;
 
   visLoader(medAI ? "Fetching data and querying AI..." : "Fetching market data...");
@@ -1324,7 +1308,7 @@ setInterval(lastMakro, 60000);
 async function kjørSammenlign() {
   const input    = document.getElementById("compareInput").value.trim();
   const periode  = document.getElementById("periodeSelect").value;
-  const groqKey  = document.getElementById("groqKey").value.trim();
+  const groqKey  = "";
   const tickers  = input.split(",").map(t => t.trim().toUpperCase()).filter(Boolean);
   if (tickers.length < 2) { alert("Enter at least 2 tickers."); return; }
 
@@ -1516,7 +1500,7 @@ async function analyserPortefolje() {
 }
 
 async function analyserPortefoljeData(medAI) {
-  const groqKey = document.getElementById("groqKey").value.trim();
+  const groqKey = "";
   try {
     const res = await fetch("/api/portefolje_analyse", {
       method: "POST",
@@ -1758,7 +1742,7 @@ async function lastInsider(ticker) {
 }
 
 async function lastNyheter(ticker) {
-  const groqKey = document.getElementById("groqKey").value.trim();
+  const groqKey = "";
   try {
     const res  = await fetch("/api/nyheter", {
       method: "POST",
