@@ -407,9 +407,117 @@ def api_earnings():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/analyst", methods=["POST"])
+def api_analyst():
+    ticker = request.json.get("ticker","").strip().upper()
+    if not ticker:
+        return jsonify({"error": "No ticker provided"}), 400
+    try:
+        aksje = yf.Ticker(ticker)
+        info  = aksje.info
+
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+        target_mean   = info.get("targetMeanPrice")
+        target_high   = info.get("targetHighPrice")
+        target_low    = info.get("targetLowPrice")
+        currency      = info.get("currency","")
+
+        upside = None
+        if current_price and target_mean:
+            upside = round((target_mean - current_price) / current_price * 100, 1)
+
+        # Ratings
+        strong_buy  = info.get("numberOfAnalystOpinions")
+        rec         = info.get("recommendationKey","")
+        buy         = info.get("recommendationMean")
+
+        # Detailed counts from analyst ratings
+        try:
+            ratings = aksje.analyst_price_targets
+        except: ratings = None
+
+        # Upgrades/downgrades
+        upgrades = []
+        try:
+            ug = aksje.upgrades_downgrades
+            if ug is not None and not ug.empty:
+                ug = ug.sort_index(ascending=False).head(15)
+                for idx, row in ug.iterrows():
+                    upgrades.append({
+                        "date":      str(idx)[:10],
+                        "firm":      str(row.get("Firm","")),
+                        "action":    str(row.get("Action","")),
+                        "fromGrade": str(row.get("From Grade","")),
+                        "toGrade":   str(row.get("To Grade","")),
+                    })
+        except: pass
+
+        return jsonify({
+            "currentPrice": round(current_price,2) if current_price else None,
+            "targetMean":   round(target_mean,2)   if target_mean   else None,
+            "targetHigh":   round(target_high,2)   if target_high   else None,
+            "targetLow":    round(target_low,2)    if target_low    else None,
+            "currency":     currency,
+            "upside":       upside,
+            "strongBuy":    info.get("strongBuy")  or info.get("numberOfStrongBuyOpinions",0),
+            "buy":          info.get("buy")         or info.get("numberOfBuyOpinions",0),
+            "hold":         info.get("hold")        or info.get("numberOfHoldOpinions",0),
+            "sell":         info.get("sell")        or info.get("numberOfSellOpinions",0),
+            "strongSell":   info.get("strongSell")  or info.get("numberOfStrongSellOpinions",0),
+            "upgrades":     upgrades,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/insider", methods=["POST"])
+def api_insider():
+    ticker = request.json.get("ticker","").strip().upper()
+    if not ticker:
+        return jsonify({"error": "No ticker provided"}), 400
+    try:
+        aksje = yf.Ticker(ticker)
+        transactions = []
+        try:
+            ins = aksje.insider_transactions
+            if ins is not None and not ins.empty:
+                ins = ins.head(25)
+                for _, row in ins.iterrows():
+                    shares = row.get("Shares") or row.get("shares")
+                    value  = row.get("Value") or row.get("value") or row.get("Start Date")
+                    try: shares = int(shares) if shares == shares else None
+                    except: shares = None
+                    try: value = int(value) if value == value else None
+                    except: value = None
+                    transactions.append({
+                        "date":   str(row.get("Start Date", row.get("Date","")))[:10],
+                        "name":   str(row.get("Insider",""))[:40],
+                        "title":  str(row.get("Position", row.get("Title","")))[:30],
+                        "type":   str(row.get("Transaction","")).strip(),
+                        "shares": shares,
+                        "value":  value,
+                    })
+        except: pass
+
+        if not transactions:
+            try:
+                ins2 = aksje.insider_purchases
+                if ins2 is not None and not ins2.empty:
+                    for _, row in ins2.head(15).iterrows():
+                        transactions.append({
+                            "date":   str(row.get("Date",""))[:10],
+                            "name":   str(row.get("Insider",""))[:40],
+                            "title":  str(row.get("Position",""))[:30],
+                            "type":   "Purchase",
+                            "shares": int(row["Shares"]) if "Shares" in row else None,
+                            "value":  int(row["Value"])  if "Value"  in row else None,
+                        })
+            except: pass
+
+        return jsonify({"transactions": transactions})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/sammenlign", methods=["POST"])
 def api_sammenlign():
     data     = request.json
     tickers  = data.get("tickers", [])
