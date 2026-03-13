@@ -297,28 +297,82 @@ def api_analyse():
     # AI analysis
     ai_tekst = ""
     if data.get("ai", False):
+        # Fetch extra data for richer AI context
+        analyst_ctx = ""
+        try:
+            target_mean  = info.get("targetMeanPrice")
+            target_high  = info.get("targetHighPrice")
+            target_low   = info.get("targetLowPrice")
+            cur_price    = info.get("currentPrice") or info.get("regularMarketPrice")
+            upside       = round((target_mean - cur_price) / cur_price * 100, 1) if target_mean and cur_price else None
+            n_analysts   = info.get("numberOfAnalystOpinions", 0)
+            strong_buy   = info.get("numberOfStrongBuyOpinions", 0) or info.get("strongBuy", 0)
+            buy          = info.get("numberOfBuyOpinions", 0) or info.get("buy", 0)
+            hold         = info.get("numberOfHoldOpinions", 0) or info.get("hold", 0)
+            sell         = info.get("numberOfSellOpinions", 0) or info.get("sell", 0)
+            strong_sell  = info.get("numberOfStrongSellOpinions", 0) or info.get("strongSell", 0)
+            analyst_ctx  = f"Analyst consensus: {n_analysts} analysts — StrongBuy={strong_buy}, Buy={buy}, Hold={hold}, Sell={sell}, StrongSell={strong_sell}. Price targets: Low={target_low}, Mean={target_mean}, High={target_high}. Upside to mean target: {upside}%."
+        except: pass
+
+        insider_ctx = ""
+        try:
+            ins = aksje.insider_transactions
+            if ins is not None and not ins.empty:
+                ins = ins.head(10)
+                buys  = sum(1 for _, r in ins.iterrows() if "buy" in str(r.get("Transaction","")).lower() or "purchase" in str(r.get("Transaction","")).lower())
+                sells = len(ins) - buys
+                recent = []
+                for _, r in ins.head(5).iterrows():
+                    recent.append(f"{str(r.get('Insider',''))[:20]} ({str(r.get('Position',''))[:15]}): {str(r.get('Transaction',''))}")
+                insider_ctx = f"Insider activity (last 10): {buys} buys, {sells} sells. Recent: {'; '.join(recent)}."
+        except: pass
+
+        earnings_ctx = ""
+        try:
+            cal = aksje.calendar
+            if cal is not None:
+                if isinstance(cal, dict):
+                    ed = cal.get("Earnings Date")
+                    if ed:
+                        next_ed = str(ed[0])[:10] if hasattr(ed, '__len__') else str(ed)[:10]
+                        earnings_ctx = f"Next earnings: {next_ed}."
+            ei = aksje.earnings_history
+            if ei is not None and not ei.empty:
+                beats = 0
+                misses = 0
+                for _, r in ei.head(4).iterrows():
+                    actual = r.get("epsActual") or r.get("Reported EPS")
+                    est    = r.get("epsEstimate") or r.get("EPS Estimate")
+                    if actual is not None and est is not None and actual == actual and est == est:
+                        if float(actual) >= float(est): beats += 1
+                        else: misses += 1
+                earnings_ctx += f" Last 4 quarters: {beats} EPS beats, {misses} misses."
+        except: pass
+
         prompt = f"""
-You are a stock analyst. Give a concise investment assessment for {fundamental['navn']} ({ticker}).
+You are a senior stock analyst. Give a comprehensive investment assessment for {fundamental['navn']} ({ticker}).
 
-Key metrics: P/E={fundamental['pe']}, Forward P/E={fundamental['forward_pe']},
-Market Cap={fundamental['mktcap']}, ROE={fundamental['roe']}, Operating Margin={fundamental['driftsmargin']},
-Consensus={fundamental['konsensus']}
+FUNDAMENTALS: P/E={fundamental['pe']}, Forward P/E={fundamental['forward_pe']}, Market Cap={fundamental['mktcap']}, ROE={fundamental['roe']}, Operating Margin={fundamental['driftsmargin']}, Consensus={fundamental['konsensus']}
 
-Technical: RSI={sig['rsi']}, MACD={'Bullish' if sig['macd_bull'] else 'Bearish'},
-SMA50={'Above' if sig['over_sma50'] else 'Below'}, SMA200={'Above' if sig['over_sma200'] else 'Below'}
+TECHNICAL: RSI={sig['rsi']}, MACD={'Bullish' if sig['macd_bull'] else 'Bearish'}, SMA50={'Above' if sig['over_sma50'] else 'Below'}, SMA200={'Above' if sig['over_sma200'] else 'Below'}
 
-Risk: Sharpe={ri.get('sharpe','N/A')}, MaxDD={ri.get('max_dd','N/A')}%, Beta={ri.get('beta','N/A')}
+RISK: Sharpe={ri.get('sharpe','N/A')}, Max Drawdown={ri.get('max_dd','N/A')}%, Beta={ri.get('beta','N/A')}
 
-Provide:
-1. Overall assessment (2-3 sentences)
-2. Key strengths (2-3 bullet points)
-3. Key risks (2-3 bullet points)
-4. Technical timing
-5. Conclusion: BUY / HOLD / SELL
+{f'ANALYST DATA: {analyst_ctx}' if analyst_ctx else ''}
+{f'INSIDER ACTIVITY: {insider_ctx}' if insider_ctx else ''}
+{f'EARNINGS: {earnings_ctx}' if earnings_ctx else ''}
 
-Max 220 words. Be direct and specific.
+Provide a structured analysis:
+1. **Overall Assessment** (2-3 sentences combining all signals)
+2. **Key Strengths** (3 bullet points)
+3. **Key Risks** (3 bullet points)
+4. **What Insiders & Analysts Signal** (1-2 sentences interpreting insider activity and analyst consensus)
+5. **Technical Timing** (1-2 sentences)
+6. **Verdict: BUY / HOLD / SELL** with one-line justification
+
+Max 280 words. Be direct, specific, and integrate all available data.
 """
-        ai_tekst = spør_groq(prompt, groq_key)
+        ai_tekst = spør_groq(prompt, groq_key, 1500)
 
     return jsonify({
         "ticker":       ticker,
