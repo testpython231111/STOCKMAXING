@@ -228,7 +228,7 @@ def api_analyse():
     data   = request.json
     ticker = data.get("ticker","").strip().upper()
     periode= data.get("periode","1y")
-    groq_key = data.get("groq_key","")
+    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
 
     if not ticker:
         return jsonify({"error": "Ingen ticker angitt"}), 400
@@ -644,7 +644,7 @@ def api_sammenlign():
     data     = request.json
     tickers  = data.get("tickers", [])
     periode  = data.get("periode", "1y")
-    groq_key = data.get("groq_key", "")
+    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
     resultat = []
 
     for t in tickers:
@@ -743,7 +743,7 @@ Be specific and direct. Max 280 words.
 def api_portefolje_analyse():
     data       = request.json
     posisjoner = data.get("posisjoner", [])
-    groq_key   = data.get("groq_key", "")
+    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
 
     if not posisjoner:
         return jsonify({"error": "No positions provided"}), 400
@@ -859,7 +859,7 @@ Be direct and action-oriented. Max 350 words.
 def api_nyheter():
     data     = request.json
     ticker   = data.get("ticker","").strip().upper()
-    groq_key = data.get("groq_key","")
+    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
     if not ticker:
         return jsonify({"error": "No ticker provided"}), 400
     try:
