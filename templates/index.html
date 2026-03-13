@@ -1021,13 +1021,13 @@ async function kjørAnalyse(medAI) {
   const groqKey = "";
   if (!ticker) return;
 
-  visLoader("Fetching market data and running AI analysis...");
+  visLoader("Fetching market data...");
 
   try {
     const res = await fetch("/api/analyse", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ticker, periode, ai: medAI, groq_key: groqKey})
+      body: JSON.stringify({ticker, periode, ai: false, groq_key: groqKey})
     });
     const data = await res.json();
     if (data.error) {
@@ -1041,9 +1041,45 @@ async function kjørAnalyse(medAI) {
     skjulLoader();
     visResultat(data);
     sisteTicker = ticker;
+
+    // Load AI in background after results are shown
+    lastAI(ticker, periode);
+
   } catch(e) {
     skjulLoader();
     alert("Nettverksfeil: " + e.message);
+  }
+}
+
+async function lastAI(ticker, periode) {
+  const aiPane = document.getElementById("pane-ai");
+  if (!aiPane) return;
+  aiPane.innerHTML = `<div style="padding:14px;color:var(--green2);font-size:11px">
+    <span class="loader-dots">Generating AI analysis</span>
+  </div>`;
+
+  try {
+    const res = await fetch("/api/ai_analyse", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ticker, periode})
+    });
+    const data = await res.json();
+    if (data.error) {
+      aiPane.innerHTML = `<div class="alert alert-error" style="margin:14px">${data.error}</div>`;
+      return;
+    }
+    const tekst = data.ai || "No AI analysis available.";
+    const html = tekst
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\n/g, "<br>");
+    aiPane.innerHTML = `<div style="padding:14px">
+      <div style="margin-bottom:8px; font-size:9px; color:var(--green2); letter-spacing:2px">⬡ GROQ LLAMA 3.3 70B — INVESTMENT ANALYSIS</div>
+      <div class="ai-text">${html}</div>
+      <div style="margin-top:12px" class="alert alert-info">⚠ This is not financial advice. Always do your own research.</div>
+    </div>`;
+  } catch(e) {
+    aiPane.innerHTML = `<div class="alert alert-error" style="margin:14px">AI analysis failed: ${e.message}</div>`;
   }
 }
 
@@ -1278,31 +1314,11 @@ function visResultat(d) {
     `<div style="color:var(--green2);font-size:11px;padding:10px">Fetching insider transactions...</div>`;
   lastInsider(d.ticker);
 
-  // ── AI ──
-  if (d.ai) {
-    const aiFormatert = d.ai
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
-    document.getElementById("pane-ai").innerHTML = `
-      <div style="margin-bottom:8px; font-size:9px; color:var(--yellow); letter-spacing:2px">
-        ⬡ GROQ LLAMA 3.3 70B — INVESTMENT ANALYSIS
-      </div>
-      <div class="ai-text">${aiFormatert}</div>
-      <div style="margin-top:12px" class="alert alert-info" style="font-size:10px">
-        ⚠ This is not financial advice. Always do your own research.
-      </div>`;
-    // Auto-bytt til AI-tab
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-    document.getElementById("aiTab").classList.add("active");
-    document.getElementById("pane-ai").classList.add("active");
-  } else {
-    document.getElementById("pane-ai").innerHTML = `
-      <div class="alert alert-info">
-        Press <strong>ANALYZE</strong> to get an AI assessment.<br>
-        Remember to add your Groq API key.
-      </div>`;
-  }
+  // ── AI — loaded async by lastAI(), just set placeholder ──
+  document.getElementById("pane-ai").innerHTML = `
+    <div style="padding:14px;color:var(--green2);font-size:11px">
+      <span class="loader-dots">Generating AI analysis</span>
+    </div>`;
 }
 
 // ── Makro (kun topplinje) ─────────────────────────────────────────────────────
