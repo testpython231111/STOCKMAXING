@@ -492,29 +492,33 @@ def api_analyst():
 
         # Upgrades/downgrades — map Yahoo action codes to readable labels
         ACTION_MAP = {
-            "main":     ("MAINTAIN",  "var(--text2)"),
-            "reit":     ("REITERATE", "var(--text2)"),
-            "init":     ("INITIATED", "var(--blue)"),
-            "upgrade":  ("UPGRADE",   "var(--green)"),
-            "downgrade":("DOWNGRADE", "var(--red)"),
-            "resume":   ("RESUMED",   "var(--blue)"),
-            "suspend":  ("SUSPENDED", "var(--yellow)"),
-            "coverage": ("INITIATED", "var(--blue)"),
+            "main":      ("MAINTAIN",  "var(--text2)", 1),
+            "reit":      ("REITERATE", "var(--text2)", 1),
+            "init":      ("INITIATED", "var(--blue)",  3),
+            "up":        ("UPGRADE",   "var(--green)", 4),
+            "down":      ("DOWNGRADE", "var(--red)",   4),
+            "upgrade":   ("UPGRADE",   "var(--green)", 4),
+            "downgrade": ("DOWNGRADE", "var(--red)",   4),
+            "resume":    ("RESUMED",   "var(--blue)",  3),
+            "suspend":   ("SUSPENDED", "var(--yellow)",3),
+            "coverage":  ("INITIATED", "var(--blue)",  3),
+            "new":       ("INITIATED", "var(--blue)",  3),
         }
 
         upgrades = []
         try:
             ug = aksje.upgrades_downgrades
             if ug is not None and not ug.empty:
-                ug = ug.sort_index(ascending=False).head(20)
+                ug = ug.sort_index(ascending=False).head(100)
                 for idx, row in ug.iterrows():
                     raw_action = str(row.get("Action","")).lower().strip()
                     from_grade = str(row.get("From Grade","")).strip()
                     to_grade   = str(row.get("To Grade","")).strip()
+                    if from_grade.lower() in ("nan","none",""): from_grade = ""
+                    if to_grade.lower()   in ("nan","none",""): to_grade   = ""
 
-                    # Try to infer upgrade/downgrade from grade change if action is just "main"
-                    if raw_action in ("main","reit") and from_grade and to_grade and from_grade != to_grade:
-                        # Grades ranked best to worst
+                    # Infer upgrade/downgrade from grade change
+                    if raw_action in ("main","reit") and from_grade and to_grade and from_grade.lower() != to_grade.lower():
                         grade_rank = {
                             "strong buy":5,"outperform":4,"overweight":4,"buy":4,
                             "market perform":3,"neutral":3,"equal-weight":3,"hold":3,"sector perform":3,
@@ -525,16 +529,20 @@ def api_analyst():
                         if t > f:   raw_action = "upgrade"
                         elif t < f: raw_action = "downgrade"
 
-                    label, color = ACTION_MAP.get(raw_action, (raw_action.upper(), "var(--text2)"))
+                    label, color, priority = ACTION_MAP.get(raw_action, (raw_action.upper(), "var(--text2)", 2))
 
-                    # Build readable rating string
-                    rating = ""
-                    if from_grade and to_grade and from_grade != to_grade:
+                    if from_grade and to_grade and from_grade.lower() != to_grade.lower():
                         rating = f"{from_grade} → {to_grade}"
                     elif to_grade:
                         rating = to_grade
                     elif from_grade:
                         rating = from_grade
+                    else:
+                        rating = ""
+
+                    # Skip only plain maintain/reiterate with absolutely no rating
+                    if priority <= 1 and not rating:
+                        continue
 
                     upgrades.append({
                         "date":   str(idx)[:10],
@@ -543,7 +551,28 @@ def api_analyst():
                         "color":  color,
                         "rating": rating,
                     })
+                    if len(upgrades) >= 20:
+                        break
         except: pass
+
+        strong_buy_n = int(info.get("numberOfStrongBuyOpinions") or info.get("strongBuy") or 0)
+        buy_n        = int(info.get("numberOfBuyOpinions")       or info.get("buy")       or 0)
+        hold_n       = int(info.get("numberOfHoldOpinions")      or info.get("hold")      or 0)
+        sell_n       = int(info.get("numberOfSellOpinions")      or info.get("sell")      or 0)
+        strong_sell_n= int(info.get("numberOfStrongSellOpinions")or info.get("strongSell")or 0)
+
+        # Fallback: try recommendations_summary if counts are all zero
+        if strong_buy_n + buy_n + hold_n + sell_n + strong_sell_n == 0:
+            try:
+                rs = aksje.recommendations_summary
+                if rs is not None and not rs.empty:
+                    latest = rs.iloc[0]
+                    strong_buy_n = int(latest.get("strongBuy",  0) or 0)
+                    buy_n        = int(latest.get("buy",        0) or 0)
+                    hold_n       = int(latest.get("hold",       0) or 0)
+                    sell_n       = int(latest.get("sell",       0) or 0)
+                    strong_sell_n= int(latest.get("strongSell", 0) or 0)
+            except: pass
 
         return jsonify({
             "currentPrice": round(current_price,2) if current_price else None,
@@ -552,11 +581,11 @@ def api_analyst():
             "targetLow":    round(target_low,2)    if target_low    else None,
             "currency":     currency,
             "upside":       upside,
-            "strongBuy":    info.get("strongBuy")  or info.get("numberOfStrongBuyOpinions",0),
-            "buy":          info.get("buy")         or info.get("numberOfBuyOpinions",0),
-            "hold":         info.get("hold")        or info.get("numberOfHoldOpinions",0),
-            "sell":         info.get("sell")        or info.get("numberOfSellOpinions",0),
-            "strongSell":   info.get("strongSell")  or info.get("numberOfStrongSellOpinions",0),
+            "strongBuy":    strong_buy_n,
+            "buy":          buy_n,
+            "hold":         hold_n,
+            "sell":         sell_n,
+            "strongSell":   strong_sell_n,
             "upgrades":     upgrades,
         })
     except Exception as e:
