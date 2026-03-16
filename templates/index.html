@@ -387,8 +387,39 @@
   }
   .tab:hover { color: var(--text3); }
   .tab.active { color: var(--green); border-bottom-color: var(--green); }
-  .tab-pane { display: none; padding: 14px; }
-  .tab-pane.active { display: block; }
+  .tab-pane {
+    display: block;
+    padding: 14px;
+    opacity: 0;
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .tab-pane.active {
+    opacity: 0;
+    visibility: visible;
+    height: auto;
+    overflow: visible;
+    pointer-events: auto;
+    animation: fadeInPane 0.18s ease forwards;
+  }
+  @keyframes fadeInPane {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Ticker flash on update */
+  @keyframes flashGreen {
+    0%   { color: var(--green); }
+    100% { color: var(--text3); }
+  }
+  @keyframes flashRed {
+    0%   { color: var(--red); }
+    100% { color: var(--text3); }
+  }
+  .ticker-flash-up  { animation: flashGreen 1.2s ease forwards; }
+  .ticker-flash-dn  { animation: flashRed   1.2s ease forwards; }
 
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -511,7 +542,7 @@
     .data-cell { background: white !important; border-bottom: 1px solid #eee; }
     .cell-label { color: #666 !important; }
     .cell-value { color: #111 !important; }
-    .tab-pane { display: block !important; }
+    .tab-pane { opacity: 1 !important; visibility: visible !important; height: auto !important; overflow: visible !important; pointer-events: auto !important; }
     #pane-teknisk, #pane-fundamental, #pane-risiko,
     #pane-earnings, #pane-analyst, #pane-insider { display: block !important; }
     .pos { color: #006600 !important; }
@@ -1425,12 +1456,12 @@ function visResultat(d) {
 async function lastMakro() {
   try {
     const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const tid = setTimeout(() => controller.abort(), 15000);
     const res  = await fetch("/api/makro", {signal: controller.signal});
     clearTimeout(tid);
     const data = await res.json();
 
-    // Market status (US market open 14:30–21:00 Norwegian time)
+    // Market status
     const nå = new Date();
     const utc = nå.getUTCHours() * 60 + nå.getUTCMinutes();
     const dag = nå.getUTCDay();
@@ -1442,36 +1473,45 @@ async function lastMakro() {
         : `<span class="market-closed">● US CLOSED</span>`;
     }
 
-    // Tooltip-tekst per indikator
     const tooltips = {
       "S&P 500":      "Broad US index — 500 largest companies",
       "Nasdaq":       "Technology-heavy US exchange",
-      "VIX":           "Fear index — above 30 = high market stress",
+      "VIX":          "Fear index — above 30 = high market stress",
       "US 10y Yield": "Rising yields = pressure on stocks &amp; growth",
       "Gold":         "Safe haven — rises in uncertain times",
-      "Oil (Brent)": "Crude oil — impacts energy stocks & inflation",
+      "Oil (Brent)":  "Crude oil — impacts energy stocks &amp; inflation",
       "EUR/USD":      "Euro vs dollar — European economic strength",
       "USD/NOK":      "Dollar vs krone — impacts Norwegian stocks",
     };
 
+    const isFirstLoad = !window._makroPrev;
+    const prev = window._makroPrev || {};
+    window._makroPrev = {};
+
     document.getElementById("tickerBar").innerHTML = data.map(d => {
-      const tip = tooltips[d.navn] || "";
-      const cls = d.endring >= 0 ? "up" : "dn";
-      const pil = d.endring >= 0 ? "▲" : "▼";
-      // Ekstra farge-logikk for VIX (høy = dårlig)
+      const tip   = tooltips[d.navn] || "";
+      const cls   = d.endring >= 0 ? "up" : "dn";
+      const pil   = d.endring >= 0 ? "▲" : "▼";
       const vixAdvarsel = d.navn === "VIX" && parseFloat(d.verdi) > 25
         ? `<span style="color:var(--red);font-size:9px"> !</span>` : "";
+
+      // Flash class if value changed since last fetch
+      const changed = !isFirstLoad && prev[d.navn] !== undefined && prev[d.navn] !== d.verdi;
+      const flashCls = changed ? (d.endring >= 0 ? " ticker-flash-up" : " ticker-flash-dn") : "";
+
+      window._makroPrev[d.navn] = d.verdi;
+
       return `
         <div class="ticker-item">
           <span class="label">${d.navn}</span>
-          <span class="val">${d.verdi}${vixAdvarsel}</span>
+          <span class="val${flashCls}">${d.verdi}${vixAdvarsel}</span>
           <span class="${cls}">${pil}${Math.abs(d.endring).toFixed(2)}%</span>
           ${tip ? `<div class="tooltip">${tip}</div>` : ""}
         </div>`;
     }).join("");
 
   } catch(e) {
-    console.error("Makro-feil:", e);
+    console.error("Makro error:", e);
   }
 }
 
@@ -2396,12 +2436,21 @@ function tegnSektorer() {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="flex:1;height:3px;background:var(--bg3);border-radius:2px;margin-right:12px">
-            <div style="height:100%;width:${barW}%;background:${barClr};border-radius:2px;transition:width 0.4s"></div>
+            <div style="height:100%;width:0%;background:${barClr};border-radius:2px;
+                        transition:width 0.6s ease ${i * 0.04}s"
+                 data-target="${barW}"></div>
           </div>
           ${sparkSvg}
         </div>
       </div>`;
   }).join("");
+
+  // Trigger bar animations after DOM renders
+  requestAnimationFrame(() => {
+    grid.querySelectorAll("[data-target]").forEach(el => {
+      el.style.width = el.dataset.target + "%";
+    });
+  });
 }
 
 function visSektorDetalj(navn, holdings) {
