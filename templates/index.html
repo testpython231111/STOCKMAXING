@@ -1250,7 +1250,9 @@ async function kjørAnalyse() {
 
   } catch(e) {
     skjulLoader();
-    alert("Network error: " + e.message);
+    console.error("Analyse error:", e);
+    document.getElementById("welcome").style.display = "";
+    document.getElementById("welcome").innerHTML = `<div class="panel-header"><span class="panel-title">ERROR</span></div><div class="panel-body"><div class="alert alert-error">Failed to load data. Please try again. (${e.message})</div></div>`;
   }
 }
 
