@@ -651,6 +651,9 @@
       <div class="nav-item active" onclick="visView('analyse')" id="nav-analyse">
         <span class="nav-icon">📊</span> STOCK ANALYSIS
       </div>
+      <div class="nav-item" onclick="visView('markedsoversikt')" id="nav-markedsoversikt">
+        <span class="nav-icon">🌐</span> MARKET OVERVIEW
+      </div>
       <div class="nav-item" onclick="visView('watchlist')" id="nav-watchlist">
         <span class="nav-icon">⭐</span> WATCHLIST
       </div>
@@ -701,17 +704,48 @@
           </div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:28px;font-style:italic">The Modern Sail</div>
 
+          <!-- Mobile search - only visible on small screens -->
+          <div style="display:none" id="mobileSearch">
+            <div style="display:flex;gap:8px;margin-bottom:24px;max-width:400px;margin-left:auto;margin-right:auto">
+              <input type="text" id="tickerInputMobile" placeholder="Enter ticker, e.g. AAPL"
+                style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--green);
+                       font-family:'IBM Plex Mono',monospace;font-size:13px;padding:10px 14px;outline:none;
+                       border-radius:0">
+              <button onclick="kjørFraMobil()"
+                style="background:var(--green2);border:none;color:white;font-family:'IBM Plex Mono',monospace;
+                       font-size:12px;padding:10px 16px;cursor:pointer;letter-spacing:1px;white-space:nowrap">
+                ANALYZE
+              </button>
+            </div>
+          </div>
+
           <!-- CTA -->
           <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.9">
             Enter a ticker symbol and press
             <span style="color:var(--green);border:1px solid var(--green2);padding:2px 8px;font-family:'IBM Plex Mono',monospace">▶ ANALYZE</span>
           </div>
+
+          <!-- Mobile-friendly search bar on welcome screen -->
+          <div style="display:flex;gap:8px;max-width:420px;margin:0 auto 20px">
+            <input type="text" id="welcomeSearch" placeholder="Enter ticker e.g. AAPL, EQNR.OL..."
+              style="flex:1;background:var(--bg3);border:1px solid var(--green2);color:var(--green);
+                     font-family:'IBM Plex Mono',monospace;font-size:13px;padding:10px 14px;outline:none;
+                     border-radius:2px"
+              onkeydown="if(event.key==='Enter') analyseFromWelcome()" />
+            <button onclick="analyseFromWelcome()"
+              style="background:var(--green2);border:none;color:var(--white);
+                     font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:1px;
+                     padding:10px 18px;cursor:pointer;white-space:nowrap;border-radius:2px">
+              ▶ ANALYZE
+            </button>
+          </div>
+
           <div style="font-size:11px;color:var(--text2);margin-bottom:36px">
             Try:
-            <span onclick="document.getElementById('tickerInput').value='AAPL';kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">AAPL</span>
-            <span onclick="document.getElementById('tickerInput').value='EQNR.OL';kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">EQNR.OL</span>
-            <span onclick="document.getElementById('tickerInput').value='TSLA';kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">TSLA</span>
-            <span onclick="document.getElementById('tickerInput').value='NVDA';kjørAnalyse(true)" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">NVDA</span>
+            <span onclick="quickAnalyse('AAPL')" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">AAPL</span>
+            <span onclick="quickAnalyse('EQNR.OL')" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">EQNR.OL</span>
+            <span onclick="quickAnalyse('TSLA')" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">TSLA</span>
+            <span onclick="quickAnalyse('NVDA')" style="color:var(--green);cursor:pointer;margin:0 8px;text-decoration:underline;text-underline-offset:3px">NVDA</span>
           </div>
 
           <!-- Feature grid -->
@@ -953,6 +987,41 @@
       </div>
     </div>
 
+    <!-- MARKET OVERVIEW VIEW -->
+    <div id="view-markedsoversikt" style="display:none; flex-direction:column; gap:14px">
+
+      <!-- AI Daily Briefing -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">🌐 MARKET OVERVIEW</span>
+          <button class="btn" onclick="lastMarkedsOversikt()" style="width:auto;padding:4px 14px;font-size:10px">↻ REFRESH</button>
+        </div>
+        <div class="panel-body" id="markedsIntro">
+          <div style="font-size:11px;color:var(--text2)">Loading market overview...</div>
+        </div>
+      </div>
+
+      <!-- Macro grid -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">LIVE MACRO</span></div>
+        <div class="panel-body">
+          <div id="markedsMakroGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1px;background:var(--border)"></div>
+        </div>
+      </div>
+
+      <!-- AI analysis -->
+      <div class="panel" id="markedsAIPanel">
+        <div class="panel-header">
+          <span class="panel-title">AI MARKET BRIEFING</span>
+          <span style="font-size:9px;color:var(--text2);letter-spacing:1px">GROQ LLAMA 3.3 70B</span>
+        </div>
+        <div class="panel-body">
+          <div id="markedsAITekst" class="ai-text" style="font-size:12px;line-height:1.8"></div>
+        </div>
+      </div>
+
+    </div>
+
   </main>
 </div>
 
@@ -983,15 +1052,16 @@ window.addEventListener("load", () => {
 
 // ── View switching ────────────────────────────────────────────────────────────
 function visView(navn) {
-  ["analyse","sammenlign","portefolje","watchlist","sektorer"].forEach(v => {
+  ["analyse","sammenlign","portefolje","watchlist","sektorer","markedsoversikt"].forEach(v => {
     const el = document.getElementById("view-"+v);
     el.style.display = v===navn ? "flex" : "none";
     el.style.flexDirection = "column";
     document.getElementById("nav-"+v)?.classList.toggle("active", v===navn);
   });
-  if (navn==="watchlist")  oppdaterWatchlist();
-  if (navn==="sektorer")   lastSektorer();
+  if (navn==="watchlist")       oppdaterWatchlist();
+  if (navn==="sektorer")        lastSektorer();
   if (navn==="portefolje" && portefolje.length > 0) oppdaterPortefolje();
+  if (navn==="markedsoversikt") lastMarkedsOversikt();
 }
 // Show analysis by default
 document.getElementById("view-sammenlign").style.display = "none";
@@ -1126,6 +1196,18 @@ function signalBull(ok, tekst) {
   return ok
     ? `<span class="signal signal-bull">▲ ${tekst}</span>`
     : `<span class="signal signal-bear">▼ ${tekst}</span>`;
+}
+
+function analyseFromWelcome() {
+  const val = document.getElementById("welcomeSearch").value.trim().toUpperCase();
+  if (!val) return;
+  document.getElementById("tickerInput").value = val;
+  kjørAnalyse();
+}
+function quickAnalyse(ticker) {
+  document.getElementById("tickerInput").value = ticker;
+  document.getElementById("welcomeSearch").value = ticker;
+  kjørAnalyse();
 }
 
 // ── Run analysis ──────────────────────────────────────────────────────────────
@@ -1481,21 +1563,34 @@ async function lastMakro() {
     const prev = window._makroPrev || {};
     window._makroPrev = {};
 
+    // Map ticker names to analyzable symbols
+    const makroTickers = {
+      "S&P 500":      "^GSPC",
+      "Nasdaq":       "^IXIC",
+      "VIX":          "^VIX",
+      "US 10y Yield": "^TNX",
+      "Gold":         "GC=F",
+      "Oil (Brent)":  "BZ=F",
+      "EUR/USD":      "EURUSD=X",
+      "USD/NOK":      "USDNOK=X",
+    };
+
     document.getElementById("tickerBar").innerHTML = data.map(d => {
-      const tip   = tooltips[d.navn] || "";
-      const cls   = d.endring >= 0 ? "up" : "dn";
-      const pil   = d.endring >= 0 ? "▲" : "▼";
+      const tip      = tooltips[d.navn] || "";
+      const cls      = d.endring >= 0 ? "up" : "dn";
+      const pil      = d.endring >= 0 ? "▲" : "▼";
+      const sym      = makroTickers[d.navn];
+      const clickable = sym ? `onclick="analyserMakro('${sym}')" title="Click to analyze ${d.navn}" style="cursor:pointer"` : "";
       const vixAdvarsel = d.navn === "VIX" && parseFloat(d.verdi) > 25
         ? `<span style="color:var(--red);font-size:9px"> !</span>` : "";
 
-      // Flash class if value changed since last fetch
       const changed = !isFirstLoad && prev[d.navn] !== undefined && prev[d.navn] !== d.verdi;
       const flashCls = changed ? (d.endring >= 0 ? " ticker-flash-up" : " ticker-flash-dn") : "";
 
       window._makroPrev[d.navn] = d.verdi;
 
       return `
-        <div class="ticker-item">
+        <div class="ticker-item" ${clickable}>
           <span class="label">${d.navn}</span>
           <span class="val${flashCls}">${d.verdi}${vixAdvarsel}</span>
           <span class="${cls}">${pil}${Math.abs(d.endring).toFixed(2)}%</span>
@@ -1510,6 +1605,78 @@ async function lastMakro() {
 
 // Oppdater makro hvert 60 sek
 setInterval(lastMakro, 60000);
+
+// ── Click on topbar ticker to analyze it ─────────────────────────────────────
+function analyserMakro(ticker) {
+  document.getElementById("tickerInput").value = ticker;
+  visView("analyse");
+  kjørAnalyse(true);
+}
+
+// ── Market Overview ───────────────────────────────────────────────────────────
+let markedsOversiktCache = null;
+
+async function lastMarkedsOversikt() {
+  const aiEl   = document.getElementById("markedsAITekst");
+  const introEl = document.getElementById("markedsIntro");
+  const gridEl  = document.getElementById("markedsMakroGrid");
+
+  aiEl.innerHTML   = `<span class="loader-dots">Generating market briefing</span>`;
+  introEl.innerHTML = `<div style="font-size:11px;color:var(--text2)">Fetching live data...</div>`;
+
+  try {
+    // Fetch macro data
+    const res  = await fetch("/api/makro");
+    const data = await res.json();
+
+    // Render macro grid
+    gridEl.innerHTML = data.map(d => {
+      const cls = d.endring >= 0 ? "var(--green)" : "var(--red)";
+      const pil = d.endring >= 0 ? "▲" : "▼";
+      return `
+        <div style="background:var(--bg2);padding:14px 12px;cursor:pointer"
+             onclick="analyserMakro('${({
+               "S&P 500":"^GSPC","Nasdaq":"^IXIC","VIX":"^VIX",
+               "US 10y Yield":"^TNX","Gold":"GC=F","Oil (Brent)":"BZ=F",
+               "EUR/USD":"EURUSD=X","USD/NOK":"USDNOK=X"
+             })[d.navn] || ''}')"
+             onmouseover="this.style.background='var(--bg3)'"
+             onmouseout="this.style.background='var(--bg2)'">
+          <div style="font-size:9px;color:var(--text2);letter-spacing:1px;margin-bottom:6px">${d.navn}</div>
+          <div style="font-size:18px;font-weight:500;color:var(--text3)">${d.verdi}</div>
+          <div style="font-size:11px;color:${cls};margin-top:3px">${pil} ${Math.abs(d.endring).toFixed(2)}%</div>
+        </div>`;
+    }).join("");
+
+    const now = new Date();
+    introEl.innerHTML = `<div style="font-size:10px;color:var(--text2)">
+      Last updated: ${now.toLocaleTimeString()} &nbsp;·&nbsp; Click any instrument to run full analysis
+    </div>`;
+
+    // Build summary for AI
+    const summary = data.map(d =>
+      `${d.navn}: ${d.verdi} (${d.endring >= 0 ? '+' : ''}${d.endring.toFixed(2)}%)`
+    ).join(", ");
+
+    // Call AI briefing
+    const aiRes = await fetch("/api/markeds_oversikt", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({makro: summary})
+    });
+    const aiData = await aiRes.json();
+    if (aiData.ai) {
+      const html = aiData.ai
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\n/g, "<br>");
+      aiEl.innerHTML = html;
+    } else {
+      aiEl.innerHTML = `<span style="color:var(--text2)">${aiData.error || "No briefing available."}</span>`;
+    }
+  } catch(e) {
+    aiEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
 
 // ── Sammenlign ────────────────────────────────────────────────────────────────
 async function kjørSammenlign() {
