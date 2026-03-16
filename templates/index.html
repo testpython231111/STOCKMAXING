@@ -888,6 +888,23 @@
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">🏭 SECTOR PERFORMANCE</span>
+          <div style="display:flex;gap:4px">
+            <button class="sektor-period-btn" data-p="1d" onclick="byttSektorPeriode('1d')"
+              style="background:rgba(45,122,184,0.15);border:1px solid var(--green2);color:var(--white);
+                     font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:1px">1D</button>
+            <button class="sektor-period-btn" data-p="1w" onclick="byttSektorPeriode('1w')"
+              style="background:transparent;border:1px solid var(--border);color:var(--text2);
+                     font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:1px">1W</button>
+            <button class="sektor-period-btn" data-p="1m" onclick="byttSektorPeriode('1m')"
+              style="background:transparent;border:1px solid var(--border);color:var(--text2);
+                     font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:1px">1M</button>
+            <button class="sektor-period-btn" data-p="3m" onclick="byttSektorPeriode('3m')"
+              style="background:transparent;border:1px solid var(--border);color:var(--text2);
+                     font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:1px">3M</button>
+            <button class="sektor-period-btn" data-p="ytd" onclick="byttSektorPeriode('ytd')"
+              style="background:transparent;border:1px solid var(--border);color:var(--text2);
+                     font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 8px;cursor:pointer;letter-spacing:1px">YTD</button>
+          </div>
           <button class="btn" onclick="lastSektorer()" style="width:auto;padding:4px 12px;font-size:10px">↻ REFRESH</button>
         </div>
         <div class="panel-body">
@@ -1103,7 +1120,7 @@ async function kjørAnalyse(medAI) {
       skjulLoader();
       document.getElementById("welcome").style.display = "";
       document.getElementById("welcome").innerHTML = `
-        <div class="panel-header"><span class="panel-title">FEIL</span></div>
+        <div class="panel-header"><span class="panel-title">ERROR</span></div>
         <div class="panel-body"><div class="alert alert-error">${data.error}</div></div>`;
       return;
     }
@@ -2262,27 +2279,26 @@ function toggleTheme() {
 
 // ── Sector overview ───────────────────────────────────────────────────────────
 const SEKTORER = [
-  { navn: "Technology",    etf: "XLK",  ikon: "💻", holdings: "AAPL,MSFT,NVDA,AVGO,META" },
-  { navn: "Healthcare",    etf: "XLV",  ikon: "🏥", holdings: "LLY,UNH,JNJ,ABBV,MRK" },
-  { navn: "Financials",    etf: "XLF",  ikon: "🏦", holdings: "BRK-B,JPM,V,MA,BAC" },
-  { navn: "Energy",        etf: "XLE",  ikon: "⚡", holdings: "XOM,CVX,COP,EOG,SLB" },
-  { navn: "Industrials",   etf: "XLI",  ikon: "🏗", holdings: "GE,RTX,CAT,HON,UNP" },
-  { navn: "Consumer Disc", etf: "XLY",  ikon: "🛒", holdings: "AMZN,TSLA,HD,MCD,NKE" },
-  { navn: "Consumer Stap", etf: "XLP",  ikon: "🛍", holdings: "PG,KO,PEP,COST,WMT" },
-  { navn: "Utilities",     etf: "XLU",  ikon: "💡", holdings: "NEE,DUK,SO,D,AEP" },
-  { navn: "Real Estate",   etf: "XLRE", ikon: "🏢", holdings: "PLD,AMT,EQIX,SPG,O" },
-  { navn: "Materials",     etf: "XLB",  ikon: "⛏", holdings: "LIN,SHW,APD,FCX,NEM" },
-  { navn: "Comm Services", etf: "XLC",  ikon: "📡", holdings: "META,GOOGL,NFLX,DIS,T" },
+  { navn: "Technology",        etf: "XLK",  ikon: "💻", holdings: "AAPL,MSFT,NVDA,AVGO,META,ORCL,CSCO,AMD,ADBE,CRM" },
+  { navn: "Healthcare",        etf: "XLV",  ikon: "🏥", holdings: "LLY,UNH,JNJ,ABBV,MRK,TMO,ABT,DHR,ISRG,PFE" },
+  { navn: "Financials",        etf: "XLF",  ikon: "🏦", holdings: "BRK-B,JPM,V,MA,BAC,WFC,GS,MS,SPGI,BLK" },
+  { navn: "Energy",            etf: "XLE",  ikon: "⚡", holdings: "XOM,CVX,COP,EOG,SLB,MPC,PSX,VLO,OXY,HES" },
+  { navn: "Industrials",       etf: "XLI",  ikon: "🏗", holdings: "GE,RTX,CAT,HON,UNP,LMT,DE,ETN,ITW,EMR" },
+  { navn: "Consumer Disc",     etf: "XLY",  ikon: "🛒", holdings: "AMZN,TSLA,HD,MCD,NKE,LOW,SBUX,TJX,BKNG,CMG" },
+  { navn: "Consumer Staples",  etf: "XLP",  ikon: "🛍", holdings: "PG,KO,PEP,COST,WMT,PM,MDLZ,CL,MO,GIS" },
+  { navn: "Utilities",         etf: "XLU",  ikon: "💡", holdings: "NEE,DUK,SO,D,AEP,EXC,SRE,XEL,PCG,WEC" },
+  { navn: "Real Estate",       etf: "XLRE", ikon: "🏢", holdings: "PLD,AMT,EQIX,SPG,O,WELL,DLR,PSA,EQR,AVB" },
+  { navn: "Materials",         etf: "XLB",  ikon: "⛏", holdings: "LIN,SHW,APD,FCX,NEM,ECL,DD,ALB,VMC,NUE" },
+  { navn: "Comm Services",     etf: "XLC",  ikon: "📡", holdings: "META,GOOGL,NFLX,DIS,T,VZ,CHTR,EA,MTCH,WBD" },
 ];
 
-let sektorCache = null;
+let sektorCache   = null;
+let sektorPeriode = "1d"; // current selected period
 
 async function lastSektorer() {
   const grid = document.getElementById("sektorGrid");
   grid.innerHTML = `<div style="color:var(--green2);font-size:11px;padding:20px;text-align:center;grid-column:1/-1">Loading sector data...</div>`;
-
   try {
-    const etfs = SEKTORER.map(s => s.etf).join(",");
     const res  = await fetch("/api/watchlist_kurs", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
@@ -2297,43 +2313,88 @@ async function lastSektorer() {
   }
 }
 
+function sektorEndring(d, periode) {
+  if (!d) return 0;
+  if (periode === "1d")  return d.endring  ?? 0;
+  if (periode === "1w")  return d.uke      ?? 0;
+  if (periode === "1m")  return d.maaned   ?? 0;
+  if (periode === "3m")  return d.tre_mnd  ?? 0;
+  if (periode === "ytd") return d.ytd      ?? 0;
+  return 0;
+}
+
+function byttSektorPeriode(p) {
+  sektorPeriode = p;
+  document.querySelectorAll(".sektor-period-btn").forEach(b => {
+    b.style.color        = b.dataset.p === p ? "var(--white)"  : "var(--text2)";
+    b.style.borderColor  = b.dataset.p === p ? "var(--green2)" : "var(--border)";
+    b.style.background   = b.dataset.p === p ? "rgba(45,122,184,0.15)" : "transparent";
+  });
+  tegnSektorer();
+}
+
 function tegnSektorer() {
   const grid = document.getElementById("sektorGrid");
   if (!sektorCache) return;
 
-  // Sort by daily change
   const sorted = [...SEKTORER].sort((a,b) => {
-    const da = sektorCache[a.etf]?.endring ?? 0;
-    const db = sektorCache[b.etf]?.endring ?? 0;
-    return db - da;
+    return sektorEndring(sektorCache[b.etf], sektorPeriode) - sektorEndring(sektorCache[a.etf], sektorPeriode);
   });
 
+  // Find max abs change for bar scaling
+  const maxAbs = Math.max(...sorted.map(s => Math.abs(sektorEndring(sektorCache[s.etf], sektorPeriode))), 1);
+
   grid.innerHTML = sorted.map((s, i) => {
-    const d = sektorCache[s.etf];
-    const endring = d?.endring ?? 0;
-    const pris    = d?.pris ?? "—";
-    const cls     = endring >= 0 ? "var(--green)" : "var(--red)";
-    const pil     = endring >= 0 ? "▲" : "▼";
-    const rank    = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "";
-    const barW    = Math.min(Math.abs(endring) * 20, 100);
-    const barClr  = endring >= 0 ? "var(--green2)" : "var(--red)";
+    const d      = sektorCache[s.etf];
+    const endring = sektorEndring(d, sektorPeriode);
+    const pris   = d?.pris ?? "—";
+    const cls    = endring >= 0 ? "var(--green)" : "var(--red)";
+    const pil    = endring >= 0 ? "▲" : "▼";
+    const rank   = i === 0 ? "▲ TOP" : i === sorted.length-1 ? "▼ BOT" : "";
+    const rankClr= i === 0 ? "var(--green)" : i === sorted.length-1 ? "var(--red)" : "var(--text2)";
+    const barW   = Math.min((Math.abs(endring) / maxAbs) * 100, 100);
+    const barClr = endring >= 0 ? "var(--green2)" : "var(--red)";
+
+    // Sparkline
+    const spark = (d?.sparkline || []);
+    const sparkSvg = spark.length > 1 ? (() => {
+      const mn = Math.min(...spark), mx = Math.max(...spark);
+      const rng = mx - mn || 1;
+      const pts = spark.map((v,i) => {
+        const x = (i/(spark.length-1))*80;
+        const y = 20 - ((v-mn)/rng)*18;
+        return `${x},${y}`;
+      }).join(" ");
+      const col = spark[spark.length-1] >= spark[0] ? "var(--green)" : "var(--red)";
+      return `<svg width="80" height="22" style="display:block">
+        <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>`;
+    })() : "";
 
     return `
       <div onclick="visSektorDetalj('${s.navn}','${s.holdings}')"
-        style="background:var(--bg2);border:1px solid var(--border);padding:12px 14px;
-               cursor:pointer;transition:border-color 0.2s;border-radius:2px"
-        onmouseover="this.style.borderColor='var(--green)'"
-        onmouseout="this.style.borderColor='var(--border)'">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:11px;color:var(--text3)">${s.ikon} ${s.navn}</span>
-          <span style="font-size:9px;color:var(--text2)">${rank} ${s.etf}</span>
+        style="background:var(--bg2);border:1px solid var(--border);padding:14px;
+               cursor:pointer;transition:all 0.2s"
+        onmouseover="this.style.borderColor='var(--green2)';this.style.background='var(--bg3)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg2)'">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:var(--text3);font-weight:500;margin-bottom:2px">${s.ikon} ${s.navn}</div>
+            <div style="font-size:9px;color:var(--text2);letter-spacing:1px">${s.etf}</div>
+          </div>
+          <span style="font-size:9px;color:${rankClr};letter-spacing:1px">${rank}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-          <span style="font-size:15px;color:var(--text3);font-weight:500">${pris}</span>
-          <span style="font-size:13px;color:${cls};font-weight:500">${pil}${Math.abs(endring).toFixed(2)}%</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:16px;color:var(--text3);font-weight:500">${pris}</span>
+          <div style="text-align:right">
+            <div style="font-size:14px;color:${cls};font-weight:600">${pil} ${Math.abs(endring).toFixed(2)}%</div>
+          </div>
         </div>
-        <div style="height:3px;background:var(--bg3);border-radius:2px">
-          <div style="height:100%;width:${barW}%;background:${barClr};border-radius:2px;transition:width 0.5s"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1;height:3px;background:var(--bg3);border-radius:2px;margin-right:12px">
+            <div style="height:100%;width:${barW}%;background:${barClr};border-radius:2px;transition:width 0.4s"></div>
+          </div>
+          ${sparkSvg}
         </div>
       </div>`;
   }).join("");
@@ -2353,24 +2414,37 @@ function visSektorDetalj(navn, holdings) {
   })
   .then(r => r.json())
   .then(data => {
+    const header = `
+      <div style="display:grid;grid-template-columns:80px 1fr 80px 70px 70px 70px;gap:8px;
+                  padding:6px 4px;border-bottom:1px solid var(--border);margin-bottom:4px">
+        <span style="font-size:9px;color:var(--text2);letter-spacing:1px">TICKER</span>
+        <span style="font-size:9px;color:var(--text2);letter-spacing:1px">NAME</span>
+        <span style="font-size:9px;color:var(--text2);letter-spacing:1px;text-align:right">PRICE</span>
+        <span style="font-size:9px;color:var(--text2);letter-spacing:1px;text-align:right">1D</span>
+        <span style="font-size:9px;color:var(--text2);letter-spacing:1px;text-align:right">1W</span>
+        <span style="font-size:9px;color:var(--text2);letter-spacing:1px;text-align:right">1M</span>
+      </div>`;
     const rader = data.map(d => {
-      const cls = d.endring >= 0 ? "var(--green)" : "var(--red)";
-      const pil = d.endring >= 0 ? "▲" : "▼";
+      const d1cls = (d.endring||0) >= 0 ? "var(--green)" : "var(--red)";
+      const wkCls = (d.uke||0)    >= 0 ? "var(--green)" : "var(--red)";
+      const moCls = (d.maaned||0) >= 0 ? "var(--green)" : "var(--red)";
+      const fmt = v => v != null ? `${v>=0?'+':''}${v.toFixed(2)}%` : "—";
       return `
         <div onclick="analyserFraWatchlist('${d.ticker}')"
-          style="display:grid;grid-template-columns:80px 1fr 80px 80px;gap:8px;
-                 padding:8px 4px;border-bottom:1px solid var(--border);cursor:pointer;
-                 align-items:center"
+          style="display:grid;grid-template-columns:80px 1fr 80px 70px 70px 70px;gap:8px;
+                 padding:8px 4px;border-bottom:1px solid rgba(26,45,69,0.5);cursor:pointer;align-items:center"
           onmouseover="this.style.background='var(--bg3)'"
           onmouseout="this.style.background=''">
-          <span style="color:var(--green);font-weight:500">${d.ticker}</span>
-          <span style="color:var(--text2);font-size:10px">${(d.navn||'').substring(0,28)}</span>
+          <span style="color:var(--green);font-weight:500;font-size:12px">${d.ticker}</span>
+          <span style="color:var(--text2);font-size:10px">${(d.navn||'').substring(0,24)}</span>
           <span style="color:var(--text3);text-align:right">${d.pris}</span>
-          <span style="color:${cls};text-align:right">${pil}${Math.abs(d.endring).toFixed(2)}%</span>
+          <span style="color:${d1cls};text-align:right;font-size:11px">${fmt(d.endring)}</span>
+          <span style="color:${wkCls};text-align:right;font-size:11px">${fmt(d.uke)}</span>
+          <span style="color:${moCls};text-align:right;font-size:11px">${fmt(d.maaned)}</span>
         </div>`;
     }).join("");
     document.getElementById("sektorDetaljBody").innerHTML =
-      `<div style="font-size:10px;color:var(--text2);margin-bottom:8px">Click a stock to analyze it</div>` + rader;
+      `<div style="font-size:9px;color:var(--text2);margin-bottom:10px;letter-spacing:1px">CLICK A STOCK TO ANALYZE · SHOWING 1D / 1W / 1M RETURNS</div>` + header + rader;
   })
   .catch(e => {
     document.getElementById("sektorDetaljBody").innerHTML =
