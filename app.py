@@ -88,11 +88,14 @@ def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
     if not key: return "No Gemini API key provided."
     try:
         genai.configure(api_key=key)
-        model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            generation_config=genai.types.GenerationConfig(max_output_tokens=maks),
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        svar = model.generate_content(
+            prompt,
+            generation_config={
+                "max_output_tokens": maks,
+                "temperature": 0.7,
+            }
         )
-        svar = model.generate_content(prompt)
         return svar.text.strip()
     except Exception as e:
         return f"Gemini error: {e}"
