@@ -91,7 +91,11 @@ def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
         headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": maks, "temperature": 0.7}
+            "generationConfig": {
+                "maxOutputTokens": maks,
+                "temperature": 0.7,
+                "thinkingConfig": {"thinkingBudget": 0}
+            }
         }
         r = _requests.post(url, json=payload, headers=headers, timeout=60)
         r.raise_for_status()
