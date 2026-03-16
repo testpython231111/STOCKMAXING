@@ -87,7 +87,7 @@ def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
     key = api_key or GEMINI_API_KEY
     if not key: return "No Gemini API key provided."
     try:
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
         headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
