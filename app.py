@@ -397,6 +397,55 @@ def api_ai_analyse():
                 earnings_ctx += f" Last 4 quarters: {beats} EPS beats, {misses} misses."
         except: pass
 
+        short_ctx = ""
+        try:
+            short_pct    = info.get("shortPercentOfFloat")
+            short_ratio  = info.get("shortRatio")          # days to cover
+            shares_short = info.get("sharesShort")
+            shares_short_prev = info.get("sharesShortPriorMonth")
+            if short_pct is not None:
+                short_pct_str = f"{round(float(short_pct)*100,1)}%"
+                change_str = ""
+                if shares_short and shares_short_prev and shares_short_prev > 0:
+                    chg = (shares_short - shares_short_prev) / shares_short_prev * 100
+                    change_str = f", changed {'+' if chg>=0 else ''}{round(chg,1)}% vs prior month"
+                short_ctx = f"Short interest: {short_pct_str} of float shorted, days-to-cover={short_ratio}{change_str}."
+        except: pass
+
+        options_ctx = ""
+        try:
+            exps = aksje.options
+            if exps:
+                # Use nearest expiration for ATM data, aggregate across first 4 for flow
+                all_call_vol, all_put_vol, all_call_oi, all_put_oi = 0, 0, 0, 0
+                for exp in exps[:4]:
+                    try:
+                        chain = aksje.option_chain(exp)
+                        all_call_vol += chain.calls['volume'].fillna(0).sum()
+                        all_put_vol  += chain.puts['volume'].fillna(0).sum()
+                        all_call_oi  += chain.calls['openInterest'].fillna(0).sum()
+                        all_put_oi   += chain.puts['openInterest'].fillna(0).sum()
+                    except: pass
+
+                pc_vol = round(all_put_vol / max(all_call_vol, 1), 2)
+                pc_oi  = round(all_put_oi  / max(all_call_oi,  1), 2)
+
+                # ATM IV from nearest expiry
+                atm_iv_str = ""
+                try:
+                    chain0 = aksje.option_chain(exps[0])
+                    cur_price = info.get("currentPrice") or info.get("regularMarketPrice", 100)
+                    calls = chain0.calls.dropna(subset=['impliedVolatility'])
+                    atm   = calls.iloc[(calls['strike'] - cur_price).abs().argsort()[:1]]
+                    atm_iv = round(float(atm['impliedVolatility'].values[0]) * 100, 1)
+                    atm_iv_str = f", ATM implied volatility={atm_iv}%"
+                except: pass
+
+                sentiment = "bearish" if pc_vol > 1.2 else "bullish" if pc_vol < 0.7 else "neutral"
+                options_ctx = (f"Options flow (next 4 expirations): Put/Call volume ratio={pc_vol} ({sentiment} sentiment), "
+                               f"Put/Call OI ratio={pc_oi}{atm_iv_str}.")
+        except: pass
+
         prompt = f"""
 You are a senior stock analyst. Give a comprehensive investment assessment for {fundamental['navn']} ({ticker}).
 
@@ -409,22 +458,173 @@ RISK: Sharpe={ri.get('sharpe','N/A')}, Max Drawdown={ri.get('max_dd','N/A')}%, B
 {f'ANALYST DATA: {analyst_ctx}' if analyst_ctx else ''}
 {f'INSIDER ACTIVITY: {insider_ctx}' if insider_ctx else ''}
 {f'EARNINGS: {earnings_ctx}' if earnings_ctx else ''}
+{f'SHORT INTEREST: {short_ctx}' if short_ctx else ''}
+{f'OPTIONS FLOW: {options_ctx}' if options_ctx else ''}
 
 Provide a structured analysis:
 1. **Overall Assessment** (2-3 sentences combining all signals)
 2. **Key Strengths** (3 bullet points)
 3. **Key Risks** (3 bullet points)
 4. **What Insiders & Analysts Signal** (1-2 sentences)
-5. **Technical Timing** (1-2 sentences)
-6. **Verdict: BUY / HOLD / SELL** with one-line justification
+5. **Short Interest & Options Flow** (1-2 sentences — interpret what short sellers and options traders are positioning for)
+6. **Technical Timing** (1-2 sentences)
+7. **Verdict: BUY / HOLD / SELL** with one-line justification
 
-Max 280 words. Be direct, specific, and integrate all available data.
+Max 320 words. Be direct, specific, and integrate all available data.
 """
         ai_tekst = spør_groq(prompt, groq_key, 1500)
         return jsonify({"ai": ai_tekst})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/short_interest", methods=["POST"])
+def api_short_interest():
+    ticker = request.json.get("ticker","").strip().upper()
+    if not ticker:
+        return jsonify({"error": "No ticker"}), 400
+    try:
+        aksje = yf.Ticker(ticker)
+        info  = aksje.info
+
+        short_pct         = info.get("shortPercentOfFloat")
+        short_ratio       = info.get("shortRatio")
+        shares_short      = info.get("sharesShort")
+        shares_short_prev = info.get("sharesShortPriorMonth")
+        date_short        = info.get("dateShortInterest")
+        float_shares      = info.get("floatShares")
+        shares_out        = info.get("sharesOutstanding")
+
+        # Month-over-month change
+        mom_change = None
+        if shares_short and shares_short_prev and shares_short_prev > 0:
+            mom_change = round((shares_short - shares_short_prev) / shares_short_prev * 100, 1)
+
+        # Interpret short level
+        if short_pct is not None:
+            pct = float(short_pct) * 100
+            if pct > 20:   sentiment = ("HIGH", "var(--red)")
+            elif pct > 10: sentiment = ("ELEVATED", "var(--yellow)")
+            elif pct > 5:  sentiment = ("MODERATE", "var(--text3)")
+            else:          sentiment = ("LOW", "var(--green)")
+        else:
+            sentiment = ("N/A", "var(--text2)")
+
+        return jsonify({
+            "shortPct":        round(float(short_pct)*100, 2) if short_pct else None,
+            "shortRatio":      round(float(short_ratio), 1) if short_ratio else None,
+            "sharesShort":     stor_tall(shares_short) if shares_short else "N/A",
+            "sharesShortPrev": stor_tall(shares_short_prev) if shares_short_prev else "N/A",
+            "momChange":       mom_change,
+            "floatShares":     stor_tall(float_shares) if float_shares else "N/A",
+            "sharesOut":       stor_tall(shares_out) if shares_out else "N/A",
+            "dateShort":       str(pd.Timestamp(date_short, unit='s'))[:10] if date_short else "N/A",
+            "sentiment":       sentiment[0],
+            "sentimentColor":  sentiment[1],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/options_flow", methods=["POST"])
+def api_options_flow():
+    ticker = request.json.get("ticker","").strip().upper()
+    if not ticker:
+        return jsonify({"error": "No ticker"}), 400
+    try:
+        aksje     = yf.Ticker(ticker)
+        info      = aksje.info
+        exps      = aksje.options
+        cur_price = info.get("currentPrice") or info.get("regularMarketPrice")
+
+        if not exps:
+            return jsonify({"error": "No options data available for this ticker"}), 404
+
+        # Aggregate across first 4 expirations for flow summary
+        total_call_vol, total_put_vol = 0, 0
+        total_call_oi,  total_put_oi  = 0, 0
+        expirations_data = []
+
+        for exp in exps[:6]:
+            try:
+                chain = aksje.option_chain(exp)
+                cv = chain.calls['volume'].fillna(0).sum()
+                pv = chain.puts['volume'].fillna(0).sum()
+                ci = chain.calls['openInterest'].fillna(0).sum()
+                pi = chain.puts['openInterest'].fillna(0).sum()
+                total_call_vol += cv
+                total_put_vol  += pv
+                total_call_oi  += ci
+                total_put_oi   += pi
+                expirations_data.append({
+                    "exp":      exp,
+                    "callVol":  int(cv),
+                    "putVol":   int(pv),
+                    "callOI":   int(ci),
+                    "putOI":    int(pi),
+                    "pcVol":    round(pv / max(cv, 1), 2),
+                })
+            except: pass
+
+        pc_vol = round(total_put_vol / max(total_call_vol, 1), 2)
+        pc_oi  = round(total_put_oi  / max(total_call_oi,  1), 2)
+
+        # Sentiment interpretation
+        if pc_vol > 1.5:   flow_sentiment = ("VERY BEARISH", "var(--red)")
+        elif pc_vol > 1.1: flow_sentiment = ("BEARISH",      "var(--red)")
+        elif pc_vol < 0.5: flow_sentiment = ("VERY BULLISH", "var(--green)")
+        elif pc_vol < 0.8: flow_sentiment = ("BULLISH",      "var(--green)")
+        else:              flow_sentiment = ("NEUTRAL",       "var(--yellow)")
+
+        # ATM implied volatility
+        atm_iv = None
+        try:
+            chain0 = aksje.option_chain(exps[0])
+            calls  = chain0.calls.dropna(subset=['impliedVolatility'])
+            if cur_price and not calls.empty:
+                atm  = calls.iloc[(calls['strike'] - cur_price).abs().argsort()[:1]]
+                atm_iv = round(float(atm['impliedVolatility'].values[0]) * 100, 1)
+        except: pass
+
+        # Top 5 calls and puts by open interest (all strikes, nearest expiry)
+        top_calls, top_puts = [], []
+        try:
+            chain0 = aksje.option_chain(exps[0])
+            for _, r in chain0.calls.sort_values('openInterest', ascending=False).head(5).iterrows():
+                top_calls.append({
+                    "strike": round(float(r['strike']), 2),
+                    "oi":     int(r['openInterest']) if r['openInterest'] == r['openInterest'] else 0,
+                    "vol":    int(r['volume']) if r['volume'] == r['volume'] else 0,
+                    "iv":     round(float(r['impliedVolatility'])*100, 1) if r['impliedVolatility'] == r['impliedVolatility'] else None,
+                })
+            for _, r in chain0.puts.sort_values('openInterest', ascending=False).head(5).iterrows():
+                top_puts.append({
+                    "strike": round(float(r['strike']), 2),
+                    "oi":     int(r['openInterest']) if r['openInterest'] == r['openInterest'] else 0,
+                    "vol":    int(r['volume']) if r['volume'] == r['volume'] else 0,
+                    "iv":     round(float(r['impliedVolatility'])*100, 1) if r['impliedVolatility'] == r['impliedVolatility'] else None,
+                })
+        except: pass
+
+        return jsonify({
+            "currentPrice":    round(float(cur_price), 2) if cur_price else None,
+            "pcVolumeRatio":   pc_vol,
+            "pcOIRatio":       pc_oi,
+            "totalCallVol":    int(total_call_vol),
+            "totalPutVol":     int(total_put_vol),
+            "totalCallOI":     int(total_call_oi),
+            "totalPutOI":      int(total_put_oi),
+            "atmIV":           atm_iv,
+            "sentiment":       flow_sentiment[0],
+            "sentimentColor":  flow_sentiment[1],
+            "expirations":     expirations_data,
+            "topCalls":        top_calls,
+            "topPuts":         top_puts,
+            "nearestExp":      exps[0],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/makro", methods=["GET"])
 def api_makro():
