@@ -17,6 +17,24 @@ from groq import Groq
 warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
+
+# ── NaN-safe JSON ─────────────────────────────────────────────────────────────
+import json as _json
+class NaNSafeEncoder(_json.JSONEncoder):
+    def iterencode(self, o, _one_shot=False):
+        # Replace NaN/Inf with null before encoding
+        return super().iterencode(self._clean(o), _one_shot)
+    def _clean(self, obj):
+        if isinstance(obj, float):
+            if obj != obj or obj == float('inf') or obj == float('-inf'):
+                return None
+            return obj
+        if isinstance(obj, dict):
+            return {k: self._clean(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [self._clean(v) for v in obj]
+        return obj
+app.json_encoder = NaNSafeEncoder
 RISIKOFRI_RENTE = 0.045
 BENCHMARK       = "^GSPC"
 GROQ_API_KEY    = os.environ.get("GROQ_API_KEY", "")
@@ -33,6 +51,17 @@ MAKRO_TICKERS = {
 }
 
 # ── Hjelpefunksjoner ──────────────────────────────────────────────────────────
+
+def sanitize(obj):
+    """Recursively replace NaN/Inf with None so JSON stays valid."""
+    if isinstance(obj, float):
+        return None if (obj != obj or obj == float('inf') or obj == float('-inf')) else obj
+    if isinstance(obj, dict):  return {k: sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):  return [sanitize(v) for v in obj]
+    return obj
+
+def safe_jsonify(data):
+    return jsonify(sanitize(data))
 
 def safe(v, pst=False, dec=2):
     try:
@@ -233,18 +262,18 @@ def api_analyse():
     groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
 
     if not ticker:
-        return jsonify({"error": "No ticker provided"}), 400
+        return safe_jsonify({"error": "No ticker provided"}), 400
 
     try:
         aksje = yf.Ticker(ticker)
         df    = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
         if df.empty:
-            return jsonify({"error": f"No data for {ticker}. Check the ticker symbol."}), 404
+            return safe_jsonify({"error": f"No data for {ticker}. Check the ticker symbol."}), 404
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         info = aksje.info
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
     # Benchmark
     bm_df = df.copy()
@@ -295,7 +324,7 @@ def api_analyse():
         "konsensus":  info.get("recommendationKey","N/A").upper(),
     }
 
-    return jsonify({
+    return safe_jsonify({
         "ticker":       ticker,
         "fundamental":  fundamental,
         "signaler":     sig,
@@ -313,15 +342,15 @@ def api_ai_analyse():
     groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
 
     if not ticker:
-        return jsonify({"error": "No ticker"}), 400
+        return safe_jsonify({"error": "No ticker"}), 400
     if not groq_key:
-        return jsonify({"error": "No API key configured"}), 400
+        return safe_jsonify({"error": "No API key configured"}), 400
 
     try:
         aksje = yf.Ticker(ticker)
         df    = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
         if df.empty:
-            return jsonify({"error": f"No data for {ticker}"}), 404
+            return safe_jsonify({"error": f"No data for {ticker}"}), 404
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         info = aksje.info
@@ -472,16 +501,16 @@ Structure your response exactly as follows:
 Max 320 words. Be specific, data-driven, and direct. Avoid generic statements.
 """
         ai_tekst = spør_groq(prompt, groq_key, 1500)
-        return jsonify({"ai": ai_tekst})
+        return safe_jsonify({"ai": ai_tekst})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 @app.route("/api/short_interest", methods=["POST"])
 def api_short_interest():
     ticker = request.json.get("ticker","").strip().upper()
     if not ticker:
-        return jsonify({"error": "No ticker"}), 400
+        return safe_jsonify({"error": "No ticker"}), 400
     try:
         aksje = yf.Ticker(ticker)
         info  = aksje.info
@@ -509,7 +538,7 @@ def api_short_interest():
         else:
             sentiment = ("N/A", "var(--text2)")
 
-        return jsonify({
+        return safe_jsonify({
             "shortPct":        round(float(short_pct)*100, 2) if short_pct else None,
             "shortRatio":      round(float(short_ratio), 1) if short_ratio else None,
             "sharesShort":     stor_tall(shares_short) if shares_short else "N/A",
@@ -522,14 +551,14 @@ def api_short_interest():
             "sentimentColor":  sentiment[1],
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/options_flow", methods=["POST"])
 def api_options_flow():
     ticker = request.json.get("ticker","").strip().upper()
     if not ticker:
-        return jsonify({"error": "No ticker"}), 400
+        return safe_jsonify({"error": "No ticker"}), 400
     try:
         aksje     = yf.Ticker(ticker)
         info      = aksje.info
@@ -537,7 +566,7 @@ def api_options_flow():
         cur_price = info.get("currentPrice") or info.get("regularMarketPrice")
 
         if not exps:
-            return jsonify({"error": "No options data available for this ticker"}), 404
+            return safe_jsonify({"error": "No options data available for this ticker"}), 404
 
         # Aggregate across first 4 expirations for flow summary
         total_call_vol, total_put_vol = 0, 0
@@ -605,7 +634,7 @@ def api_options_flow():
                 })
         except: pass
 
-        return jsonify({
+        return safe_jsonify({
             "currentPrice":    round(float(cur_price), 2) if cur_price else None,
             "pcVolumeRatio":   pc_vol,
             "pcOIRatio":       pc_oi,
@@ -622,7 +651,7 @@ def api_options_flow():
             "nearestExp":      exps[0],
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/makro", methods=["GET"])
@@ -638,13 +667,13 @@ def api_makro():
             endring = (siste-forrige)/forrige*100
             rader.append({"navn":navn,"verdi":round(siste,2),"endring":round(endring,2)})
         except: rader.append({"navn":navn,"verdi":"N/A","endring":0})
-    return jsonify(rader)
+    return safe_jsonify(rader)
 
 @app.route("/api/earnings", methods=["POST"])
 def api_earnings():
     ticker = request.json.get("ticker","").strip().upper()
     if not ticker:
-        return jsonify({"error": "No ticker provided"}), 400
+        return safe_jsonify({"error": "No ticker provided"}), 400
     try:
         aksje = yf.Ticker(ticker)
 
@@ -695,18 +724,18 @@ def api_earnings():
                         history.append({"date": str(idx)[:10], "actual": actual, "estimate": estimate})
             except: pass
 
-        return jsonify({
+        return safe_jsonify({
             "next_earnings": {"date": next_date, "time": next_time, "estimate": next_est} if next_date else None,
             "history": history
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 @app.route("/api/analyst", methods=["POST"])
 def api_analyst():
     ticker = request.json.get("ticker","").strip().upper()
     if not ticker:
-        return jsonify({"error": "No ticker provided"}), 400
+        return safe_jsonify({"error": "No ticker provided"}), 400
     try:
         aksje = yf.Ticker(ticker)
         info  = aksje.info
@@ -815,7 +844,7 @@ def api_analyst():
                     strong_sell_n= int(latest.get("strongSell", 0) or 0)
             except: pass
 
-        return jsonify({
+        return safe_jsonify({
             "currentPrice": round(current_price,2) if current_price else None,
             "targetMean":   round(target_mean,2)   if target_mean   else None,
             "targetHigh":   round(target_high,2)   if target_high   else None,
@@ -830,13 +859,13 @@ def api_analyst():
             "upgrades":     upgrades,
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 @app.route("/api/insider", methods=["POST"])
 def api_insider():
     ticker = request.json.get("ticker","").strip().upper()
     if not ticker:
-        return jsonify({"error": "No ticker provided"}), 400
+        return safe_jsonify({"error": "No ticker provided"}), 400
     try:
         aksje = yf.Ticker(ticker)
         transactions = []
@@ -876,9 +905,9 @@ def api_insider():
                         })
             except: pass
 
-        return jsonify({"transactions": transactions})
+        return safe_jsonify({"transactions": transactions})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/sammenlign", methods=["POST"])
@@ -984,7 +1013,7 @@ Be decisive. A client is making a real allocation decision. Max 300 words.
 """
         ai_tekst = spør_groq(prompt, groq_key, 1200)
 
-    return jsonify({"aksjer": resultat, "ai": ai_tekst})
+    return safe_jsonify({"aksjer": resultat, "ai": ai_tekst})
 
 @app.route("/api/portefolje_analyse", methods=["POST"])
 def api_portefolje_analyse():
@@ -993,7 +1022,7 @@ def api_portefolje_analyse():
     groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
 
     if not posisjoner:
-        return jsonify({"error": "No positions provided"}), 400
+        return safe_jsonify({"error": "No positions provided"}), 400
 
     resultat      = []
     total_verdi   = 0
@@ -1092,7 +1121,7 @@ Be direct and action-oriented. This client needs clear guidance. Max 380 words.
 """
         ai_tekst = spør_groq(prompt, groq_key, 1500)
 
-    return jsonify({
+    return safe_jsonify({
         "posisjoner":     resultat,
         "total_verdi":    round(total_verdi, 2),
         "total_kostnad":  round(total_kostnad, 2),
@@ -1108,7 +1137,7 @@ def api_nyheter():
     ticker   = data.get("ticker","").strip().upper()
     groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
     if not ticker:
-        return jsonify({"error": "No ticker provided"}), 400
+        return safe_jsonify({"error": "No ticker provided"}), 400
     try:
         aksje  = yf.Ticker(ticker)
         nyheter = aksje.news or []
@@ -1153,9 +1182,9 @@ Max 120 words. Focus on what actually moves the stock price.
 """
             ai_sentiment = spør_groq(prompt, groq_key, 400)
 
-        return jsonify({"nyheter": resultat, "ai_sentiment": ai_sentiment})
+        return safe_jsonify({"nyheter": resultat, "ai_sentiment": ai_sentiment})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return safe_jsonify({"error": str(e)}), 500
 
 @app.route("/api/watchlist_kurs", methods=["POST"])
 def api_watchlist_kurs():
