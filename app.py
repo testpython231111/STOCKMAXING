@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import yfinance as yf
 from flask import Flask, request, jsonify, render_template
-from groq import Groq
+import google.generativeai as genai
 
 warnings.filterwarnings("ignore")
 
@@ -22,7 +22,7 @@ app = Flask(__name__)
 
 RISIKOFRI_RENTE = 0.045
 BENCHMARK       = "^GSPC"
-GROQ_API_KEY    = os.environ.get("GROQ_API_KEY", "")
+GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
 
 MAKRO_TICKERS = {
     "S&P 500":       "^GSPC",
@@ -84,18 +84,18 @@ def stor_tall(n):
     except: return "N/A"
 
 def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
-    key = api_key or GROQ_API_KEY
-    if not key: return "No Groq API key provided."
+    key = api_key or GEMINI_API_KEY
+    if not key: return "No Gemini API key provided."
     try:
-        klient = Groq(api_key=key)
-        svar = klient.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role":"user","content":prompt}],
-            max_tokens=maks,
+        genai.configure(api_key=key)
+        model = genai.GenerativeModel(
+            model_name="gemini-2.0-flash",
+            generation_config=genai.types.GenerationConfig(max_output_tokens=maks),
         )
-        return svar.choices[0].message.content.strip()
+        svar = model.generate_content(prompt)
+        return svar.text.strip()
     except Exception as e:
-        return f"Groq error: {e}"
+        return f"Gemini error: {e}"
 
 # ── Teknisk analyse ───────────────────────────────────────────────────────────
 
@@ -362,11 +362,11 @@ def api_ai_analyse():
     data     = request.json
     ticker   = data.get("ticker","").strip().upper()
     periode  = data.get("periode","1y")
-    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
 
     if not ticker:
         return safe_jsonify({"error": "No ticker"}), 400
-    if not groq_key:
+    if not gemini_key:
         return safe_jsonify({"error": "No API key configured"}), 400
 
     try:
@@ -523,7 +523,7 @@ Structure your response exactly as follows:
 
 Max 320 words. Be specific, data-driven, and direct. Avoid generic statements.
 """
-        ai_tekst = spør_groq(prompt, groq_key, 1500)
+        ai_tekst = spør_groq(prompt, gemini_key, 1500)
         return safe_jsonify({"ai": ai_tekst})
 
     except Exception as e:
@@ -681,8 +681,8 @@ def api_options_flow():
 def api_markeds_oversikt():
     data     = request.json
     makro    = data.get("makro", "")
-    groq_key = os.environ.get("GROQ_API_KEY", "")
-    if not groq_key:
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if not gemini_key:
         return safe_jsonify({"error": "No API key configured"}), 400
     try:
         from datetime import datetime
@@ -704,7 +704,7 @@ Write a concise professional market briefing covering:
 
 Keep it professional, data-driven, and concise. Max 300 words.
 """
-        ai_tekst = spør_groq(prompt, groq_key, 1200)
+        ai_tekst = spør_groq(prompt, gemini_key, 1200)
         return safe_jsonify({"ai": ai_tekst})
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
@@ -971,7 +971,7 @@ def api_sammenlign():
     data     = request.json
     tickers  = data.get("tickers", [])
     periode  = data.get("periode", "1y")
-    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
     resultat = []
 
     # Download benchmark once outside the loop
@@ -1045,7 +1045,7 @@ def api_sammenlign():
 
     # AI comparison
     ai_tekst = ""
-    if groq_key and len(resultat) >= 2:
+    if gemini_key and len(resultat) >= 2:
         summary = "\n".join([
             f"{r['ticker']} ({r['navn']}): P/E={r['pe']}, Sharpe={r['sharpe']}, "
             f"Return={r['avk']}%, Volatility={r['vol']}%, MaxDD={r['max_dd']}%, "
@@ -1067,7 +1067,7 @@ Your analysis must cover:
 
 Be decisive. A client is making a real allocation decision. Max 300 words.
 """
-        ai_tekst = spør_groq(prompt, groq_key, 1200)
+        ai_tekst = spør_groq(prompt, gemini_key, 1200)
 
     return safe_jsonify({"aksjer": resultat, "ai": ai_tekst})
 
@@ -1075,7 +1075,7 @@ Be decisive. A client is making a real allocation decision. Max 300 words.
 def api_portefolje_analyse():
     data       = request.json
     posisjoner = data.get("posisjoner", [])
-    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
 
     if not posisjoner:
         return safe_jsonify({"error": "No positions provided"}), 400
@@ -1147,7 +1147,7 @@ def api_portefolje_analyse():
 
     # AI analysis
     ai_tekst = ""
-    if groq_key and resultat:
+    if gemini_key and resultat:
         pos_info = "\n".join([
             f"{r['ticker']} ({r.get('navn',r['ticker'])}): "
             f"Shares={r.get('antall')}, AvgPrice={r.get('snittpris')}, "
@@ -1175,7 +1175,7 @@ Provide a professional portfolio review:
 
 Be direct and action-oriented. This client needs clear guidance. Max 380 words.
 """
-        ai_tekst = spør_groq(prompt, groq_key, 1500)
+        ai_tekst = spør_groq(prompt, gemini_key, 1500)
 
     return safe_jsonify({
         "posisjoner":     resultat,
@@ -1191,7 +1191,7 @@ Be direct and action-oriented. This client needs clear guidance. Max 380 words.
 def api_nyheter():
     data     = request.json
     ticker   = data.get("ticker","").strip().upper()
-    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
     try:
@@ -1221,7 +1221,7 @@ def api_nyheter():
 
         # AI sentiment analysis
         ai_sentiment = ""
-        if groq_key and resultat:
+        if gemini_key and resultat:
             headlines = "\n".join([f"- {n['tittel']}" for n in resultat])
             prompt = f"""
 You are a financial news analyst. Assess the market sentiment for {ticker} based on these recent headlines.
@@ -1236,7 +1236,7 @@ Provide:
 
 Max 120 words. Focus on what actually moves the stock price.
 """
-            ai_sentiment = spør_groq(prompt, groq_key, 400)
+            ai_sentiment = spør_groq(prompt, gemini_key, 400)
 
         return safe_jsonify({"nyheter": resultat, "ai_sentiment": ai_sentiment})
     except Exception as e:
