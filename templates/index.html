@@ -784,7 +784,7 @@
 
           <!-- Footer note -->
           <div style="font-size:9px;color:var(--text2);letter-spacing:1px;opacity:0.6">
-            DATA: YAHOO FINANCE &nbsp;·&nbsp; AI: GROQ LLAMA 3.3 70B &nbsp;·&nbsp; NOT FINANCIAL ADVICE
+            DATA: YAHOO FINANCE &nbsp;·&nbsp; AI: GEMINI 2.0 FLASH &nbsp;·&nbsp; NOT FINANCIAL ADVICE
           </div>
 
         </div>
@@ -1019,7 +1019,7 @@
       <div class="panel" id="markedsAIPanel">
         <div class="panel-header">
           <span class="panel-title">AI MARKET BRIEFING</span>
-          <span style="font-size:9px;color:var(--text2);letter-spacing:1px">GROQ LLAMA 3.3 70B</span>
+          <span style="font-size:9px;color:var(--text2);letter-spacing:1px">GEMINI 2.0 FLASH</span>
         </div>
         <div class="panel-body">
           <div id="markedsAITekst" class="ai-text" style="font-size:12px;line-height:1.8"></div>
@@ -1220,7 +1220,7 @@ function quickAnalyse(ticker) {
 async function kjørAnalyse() {
   const ticker  = document.getElementById("tickerInput").value.trim().toUpperCase();
   const periode = document.getElementById("periodeSelect").value;
-  const groqKey = "";
+  const geminiKey = "";
   if (!ticker) return;
 
   visLoader("Fetching market data...");
@@ -1229,7 +1229,7 @@ async function kjørAnalyse() {
     const res = await fetch("/api/analyse", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ticker, periode, ai: false, groq_key: groqKey})
+      body: JSON.stringify({ticker, periode, ai: false, gemini_key: geminiKey})
     });
     const data = await res.json();
     if (data.error) {
@@ -1276,7 +1276,7 @@ async function lastAI(ticker, periode) {
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\n/g, "<br>");
     aiPane.innerHTML = `<div style="padding:14px">
-      <div style="margin-bottom:8px; font-size:9px; color:var(--green2); letter-spacing:2px">AI ANALYSIS — GROQ LLAMA 3.3 70B</div>
+      <div style="margin-bottom:8px; font-size:9px; color:var(--green2); letter-spacing:2px">AI ANALYSIS — GEMINI 2.0 FLASH</div>
       <div class="ai-text">${html}</div>
       <div style="margin-top:12px" class="alert alert-info">⚠ This is not financial advice. Always do your own research.</div>
     </div>`;
@@ -1688,7 +1688,7 @@ async function lastMarkedsOversikt() {
 async function kjørSammenlign() {
   const input    = document.getElementById("compareInput").value.trim();
   const periode  = document.getElementById("periodeSelect").value;
-  const groqKey  = "";
+  const geminiKey  = "";
   const tickers  = input.split(",").map(t => t.trim().toUpperCase()).filter(Boolean);
   if (tickers.length < 2) { alert("Enter at least 2 tickers."); return; }
 
@@ -1703,7 +1703,7 @@ async function kjørSammenlign() {
     const res  = await fetch("/api/sammenlign", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({tickers, periode, groq_key: groqKey})
+      body: JSON.stringify({tickers, periode, gemini_key: geminiKey})
     });
     const data = await res.json();
     const aksjer = data.aksjer || [];
@@ -1880,12 +1880,12 @@ async function analyserPortefolje() {
 }
 
 async function analyserPortefoljeData(medAI) {
-  const groqKey = "";
+  const geminiKey = "";
   try {
     const res = await fetch("/api/portefolje_analyse", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({posisjoner: portefolje, groq_key: medAI ? groqKey : ""})
+      body: JSON.stringify({posisjoner: portefolje, gemini_key: medAI ? geminiKey : ""})
     });
     const data = await res.json();
     if (data.error) { alert(data.error); return; }
@@ -2303,12 +2303,12 @@ async function lastOptions(ticker) {
 }
 
 async function lastNyheter(ticker) {
-  const groqKey = "";
+  const geminiKey = "";
   try {
     const res  = await fetch("/api/nyheter", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ticker, groq_key: groqKey})
+      body: JSON.stringify({ticker, gemini_key: geminiKey})
     });
     const data = await res.json();
     if (data.error) {
