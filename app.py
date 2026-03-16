@@ -314,7 +314,6 @@ def api_analyse():
     df  = beregn_tekniske(df)
     sig = hent_signaler(df)
     ri  = beregn_risiko(df, bm_df)
-    graf = lag_graf(df, ticker)
 
     # Kurshistorikk for chart
     historikk = {
@@ -356,12 +355,36 @@ def api_analyse():
         "fundamental":  fundamental,
         "signaler":     sig,
         "risiko":       ri,
-        "graf":         graf,
+        "graf":         "",  # loaded separately via /api/chart
         "historikk":    historikk,
         "ai":           "",
     }
     cache_set(cache_key, result)
     return safe_jsonify(result)
+
+
+@app.route("/api/chart", methods=["POST"])
+def api_chart():
+    data    = request.json
+    ticker  = data.get("ticker","").strip().upper()
+    periode = data.get("periode","1y")
+    if not ticker:
+        return safe_jsonify({"error": "No ticker"}), 400
+    cache_key = f"chart:{ticker}:{periode}"
+    cached = cache_get(cache_key)
+    if cached:
+        return safe_jsonify({"graf": cached})
+    try:
+        df = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
+        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+        if df.empty:
+            return safe_jsonify({"error": "No data"}), 404
+        df = beregn_tekniske(df)
+        graf = lag_graf(df, ticker)
+        cache_set(cache_key, graf)
+        return safe_jsonify({"graf": graf})
+    except Exception as e:
+        return safe_jsonify({"error": str(e)}), 500
 
 @app.route("/api/ai_analyse", methods=["POST"])
 def api_ai_analyse():
