@@ -2,8 +2,10 @@
 Aksjeanalyse PRO — Flask Web App
 """
 
-import os, io, base64, warnings, json, gc
+import os, io, base64, warnings, json, gc, time
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -32,6 +34,27 @@ MAKRO_TICKERS = {
     "EUR/USD":       "EURUSD=X",
     "USD/NOK":       "USDNOK=X",
 }
+
+# ── Simple in-memory cache (TTL-based) ───────────────────────────────────────
+_cache = {}
+_cache_lock = Lock()
+CACHE_TTL = 300  # 5 minutes
+
+def cache_get(key):
+    with _cache_lock:
+        entry = _cache.get(key)
+        if entry and time.time() - entry["ts"] < CACHE_TTL:
+            return entry["data"]
+        return None
+
+def cache_set(key, data):
+    with _cache_lock:
+        _cache[key] = {"data": data, "ts": time.time()}
+        # Evict old entries if cache grows large
+        if len(_cache) > 200:
+            cutoff = time.time() - CACHE_TTL
+            for k in [k for k,v in _cache.items() if v["ts"] < cutoff]:
+                del _cache[k]
 
 # ── Hjelpefunksjoner ──────────────────────────────────────────────────────────
 
@@ -242,30 +265,45 @@ def api_analyse():
     data   = request.json
     ticker = data.get("ticker","").strip().upper()
     periode= data.get("periode","1y")
-    groq_key = os.environ.get("GROQ_API_KEY", data.get("groq_key",""))
 
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
 
+    # Check cache
+    cache_key = f"analyse:{ticker}:{periode}"
+    cached = cache_get(cache_key)
+    if cached:
+        return safe_jsonify(cached)
+
     try:
-        aksje = yf.Ticker(ticker)
-        df    = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
+        # Fetch stock data + benchmark in parallel
+        def fetch_stock():
+            aksje = yf.Ticker(ticker)
+            df = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
+            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+            return aksje, df
+
+        def fetch_benchmark():
+            try:
+                bm = yf.download(BENCHMARK, period=periode, progress=False, auto_adjust=True)
+                if isinstance(bm.columns, pd.MultiIndex): bm.columns = bm.columns.get_level_values(0)
+                return bm
+            except: return None
+
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_stock = ex.submit(fetch_stock)
+            f_bm    = ex.submit(fetch_benchmark)
+            aksje, df = f_stock.result()
+            bm_result = f_bm.result()
+
         if df.empty:
             return safe_jsonify({"error": f"No data for {ticker}. Check the ticker symbol."}), 404
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        info = aksje.info
+
+        info  = aksje.info
+        bm_df = bm_result if bm_result is not None and not bm_result.empty else df.copy()
+
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
-
-    # Benchmark
-    bm_df = df.copy()
-    try:
-        _bm = yf.download(BENCHMARK, period=periode, progress=False, auto_adjust=True)
-        if not _bm.empty:
-            if isinstance(_bm.columns, pd.MultiIndex): _bm.columns = _bm.columns.get_level_values(0)
-            bm_df = _bm
-    except: pass
 
     df  = beregn_tekniske(df)
     sig = hent_signaler(df)
@@ -307,7 +345,7 @@ def api_analyse():
         "konsensus":  info.get("recommendationKey","N/A").upper(),
     }
 
-    return safe_jsonify({
+    result = {
         "ticker":       ticker,
         "fundamental":  fundamental,
         "signaler":     sig,
@@ -315,7 +353,9 @@ def api_analyse():
         "graf":         graf,
         "historikk":    historikk,
         "ai":           "",
-    })
+    }
+    cache_set(cache_key, result)
+    return safe_jsonify(result)
 
 @app.route("/api/ai_analyse", methods=["POST"])
 def api_ai_analyse():
@@ -1204,19 +1244,22 @@ Max 120 words. Focus on what actually moves the stock price.
 
 @app.route("/api/watchlist_kurs", methods=["POST"])
 def api_watchlist_kurs():
-    data     = request.json
-    tickers  = data.get("tickers", [])
-    resultat = []
-    for t in tickers:
+    data    = request.json
+    tickers = data.get("tickers", [])
+    if not tickers:
+        return safe_jsonify([])
+
+    def fetch_one(t):
         try:
+            cached = cache_get(f"wl:{t}")
+            if cached: return cached
+
             aksje = yf.Ticker(t)
             info  = aksje.info
-            # Fetch 1y of data — covers all periods we need
             df = yf.download(t, period="1y", progress=False, auto_adjust=True)
             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
             if df.empty:
-                resultat.append({"ticker": t, "feil": "No data"})
-                continue
+                return {"ticker": t, "feil": "No data"}
 
             last = float(df["Close"].iloc[-1])
             prev = float(df["Close"].iloc[-2]) if len(df) > 1 else last
@@ -1227,42 +1270,41 @@ def api_watchlist_kurs():
                     return round((last - p) / p * 100, 2)
                 except: return None
 
-            # 1W ≈ 5 trading days, 1M ≈ 21, 3M ≈ 63
-            change_1d = round((last - prev) / prev * 100, 2)
-            change_1w = pct(5)
-            change_1m = pct(21)
-            change_3m = pct(63)
-
-            # YTD — first trading day of the year
             try:
                 year_start = df[df.index.year == df.index[-1].year].iloc[0]
                 ytd = round((last - float(year_start["Close"])) / float(year_start["Close"]) * 100, 2)
             except: ytd = None
 
-            high52 = round(float(df["Close"].max()), 2)
-            low52  = round(float(df["Close"].min()), 2)
-            sparkline = [round(float(p), 2) for p in df["Close"].iloc[-30:]]
-
-            resultat.append({
+            entry = {
                 "ticker":    t,
                 "navn":      info.get("longName", t),
                 "sektor":    info.get("sector", "N/A"),
                 "pris":      round(last, 2),
-                "endring":   change_1d,
-                "uke":       change_1w,
-                "maaned":    change_1m,
-                "tre_mnd":   change_3m,
+                "endring":   round((last - prev) / prev * 100, 2),
+                "uke":       pct(5),
+                "maaned":    pct(21),
+                "tre_mnd":   pct(63),
                 "ytd":       ytd,
-                "høy52":     high52,
-                "lav52":     low52,
+                "høy52":     round(float(df["Close"].max()), 2),
+                "lav52":     round(float(df["Close"].min()), 2),
                 "mktcap":    stor_tall(info.get("marketCap")),
                 "pe":        safe(info.get("trailingPE")),
                 "konsensus": info.get("recommendationKey", "N/A").upper(),
-                "sparkline": sparkline,
-            })
+                "sparkline": [round(float(p), 2) for p in df["Close"].iloc[-30:]],
+            }
+            cache_set(f"wl:{t}", entry)
+            return entry
         except Exception as e:
-            resultat.append({"ticker": t, "feil": str(e)[:50]})
-    return jsonify(resultat)
+            return {"ticker": t, "feil": str(e)[:50]}
+
+    # Fetch all tickers in parallel (max 6 concurrent)
+    resultat = [None] * len(tickers)
+    with ThreadPoolExecutor(max_workers=min(len(tickers), 6)) as ex:
+        futures = {ex.submit(fetch_one, t): i for i, t in enumerate(tickers)}
+        for future in as_completed(futures):
+            resultat[futures[future]] = future.result()
+
+    return safe_jsonify([r for r in resultat if r is not None])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
