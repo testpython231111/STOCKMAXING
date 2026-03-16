@@ -637,6 +637,39 @@ def api_options_flow():
         return safe_jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/markeds_oversikt", methods=["POST"])
+def api_markeds_oversikt():
+    data     = request.json
+    makro    = data.get("makro", "")
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_key:
+        return safe_jsonify({"error": "No API key configured"}), 400
+    try:
+        from datetime import datetime
+        today = datetime.now().strftime("%A, %B %d, %Y")
+        prompt = f"""
+You are a senior macro strategist providing a daily market briefing for professional investors at Trade Wind Partners.
+
+Today is {today}.
+
+CURRENT MARKET DATA:
+{makro}
+
+Write a concise professional market briefing covering:
+1. **Market Pulse** — overall risk-on/risk-off tone and what's driving it today
+2. **Key Movers** — which instruments stand out and why (focus on unusual moves)
+3. **Fixed Income & FX** — what yields and currency moves signal about macro expectations
+4. **Upcoming Events** — key macro events to watch this week (Fed meetings, CPI, NFP, ECB, earnings seasons — use your knowledge of typical calendar)
+5. **Trade Wind Outlook** — one actionable takeaway for equity investors today
+
+Keep it professional, data-driven, and concise. Max 300 words.
+"""
+        ai_tekst = spør_groq(prompt, groq_key, 1200)
+        return safe_jsonify({"ai": ai_tekst})
+    except Exception as e:
+        return safe_jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/makro", methods=["GET"])
 def api_makro():
     rader = []
