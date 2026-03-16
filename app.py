@@ -14,8 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import yfinance as yf
 from flask import Flask, request, jsonify, render_template
-from google import genai
-from google.genai import types as genai_types
+import requests as _requests
 
 warnings.filterwarnings("ignore")
 
@@ -88,16 +87,14 @@ def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
     key = api_key or GEMINI_API_KEY
     if not key: return "No Gemini API key provided."
     try:
-        client = genai.Client(api_key=key)
-        svar = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                max_output_tokens=maks,
-                temperature=0.7,
-            )
-        )
-        return svar.text.strip()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": maks, "temperature": 0.7}
+        }
+        r = _requests.post(url, json=payload, timeout=60)
+        r.raise_for_status()
+        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     except Exception as e:
         return f"Gemini error: {e}"
 
