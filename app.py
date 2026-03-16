@@ -20,9 +20,6 @@ warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
 
-# Clear stale cache on startup
-_cache.clear()
-
 RISIKOFRI_RENTE = 0.045
 BENCHMARK       = "^GSPC"
 GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
@@ -42,6 +39,7 @@ MAKRO_TICKERS = {
 _cache = {}
 _cache_lock = Lock()
 CACHE_TTL = 300  # 5 minutes
+_cache.clear()  # Clear stale cache on startup
 
 def cache_get(key):
     with _cache_lock:
