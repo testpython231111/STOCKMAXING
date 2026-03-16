@@ -432,7 +432,7 @@
     border-left: 3px solid;
   }
   .alert-error { border-color: var(--red);    color: var(--red);    background: rgba(255,51,102,0.05); }
-  .alert-info  { border-color: var(--blue);   color: var(--blue);   background: rgba(0,180,216,0.05); }
+  .alert-info  { border-color: var(--text2);  color: var(--text2);  background: transparent; }
   .alert-success{border-color: var(--green2); color: var(--green);  background: rgba(74,158,214,0.06); }
 
   /* ── Groq key section ── */
@@ -676,7 +676,7 @@
 
     <div style="margin-top:auto; font-size:9px; color:var(--text2); line-height:1.6">
       Data: Yahoo Finance<br>
-      AI: Groq LLaMA 3.3 70B<br>
+      AI: Gemini 2.5 Flash<br>
       ⚠ Not financial advice
     </div>
   </aside>
@@ -778,7 +778,7 @@
             </div>
             <div style="background:var(--bg2);padding:16px 14px;text-align:left">
               <div style="font-size:10px;color:var(--green2);letter-spacing:1px;margin-bottom:5px">AI ANALYSIS</div>
-              <div style="font-size:10px;color:var(--text2);line-height:1.7">LLaMA 3.3 70B — strengths, risks, verdict across all signals</div>
+              <div style="font-size:10px;color:var(--text2);line-height:1.7">Gemini 2.5 Flash — strengths, risks, verdict across all signals</div>
             </div>
           </div>
 
@@ -1015,14 +1015,23 @@
         </div>
       </div>
 
-      <!-- AI analysis -->
-      <div class="panel" id="markedsAIPanel">
-        <div class="panel-header">
-          <span class="panel-title">AI MARKET BRIEFING</span>
-          <span style="font-size:9px;color:var(--text2);letter-spacing:1px">GEMINI 2.0 FLASH</span>
+      <!-- Gold Chart -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">📈 GOLD (XAU/USD)</span></div>
+        <div class="panel-body" style="padding:0">
+          <div class="tradingview-widget-container" style="height:300px">
+            <div id="tv-gold" style="height:300px"></div>
+          </div>
         </div>
-        <div class="panel-body">
-          <div id="markedsAITekst" class="ai-text" style="font-size:12px;line-height:1.8"></div>
+      </div>
+
+      <!-- EUR/USD Chart -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">💱 EUR/USD</span></div>
+        <div class="panel-body" style="padding:0">
+          <div class="tradingview-widget-container" style="height:300px">
+            <div id="tv-eurusd" style="height:300px"></div>
+          </div>
         </div>
       </div>
 
@@ -1648,29 +1657,20 @@ function analyserMakro(ticker) {
 let markedsOversiktCache = null;
 
 async function lastMarkedsOversikt() {
-  const aiEl   = document.getElementById("markedsAITekst");
   const introEl = document.getElementById("markedsIntro");
   const gridEl  = document.getElementById("markedsMakroGrid");
 
-  aiEl.innerHTML   = `<span class="loader-dots">Generating market briefing</span>`;
   introEl.innerHTML = `<div style="font-size:11px;color:var(--text2)">Fetching live data...</div>`;
 
   try {
-    // Fetch macro data
     const res  = await fetch("/api/makro");
     const data = await res.json();
 
-    // Render macro grid
     gridEl.innerHTML = data.map(d => {
       const cls = d.endring >= 0 ? "var(--green)" : "var(--red)";
-      const pil = d.endring >= 0 ? "▲" : "▼";
+      const pil = d.endring >= 0 ? "\u25b2" : "\u25bc";
       return `
-        <div style="background:var(--bg2);padding:14px 12px;cursor:pointer"
-             onclick="analyserMakro('${({
-               "S&P 500":"^GSPC","Nasdaq":"^IXIC","VIX":"^VIX",
-               "US 10y Yield":"^TNX","Gold":"GC=F","Oil (Brent)":"BZ=F",
-               "EUR/USD":"EURUSD=X","USD/NOK":"USDNOK=X"
-             })[d.navn] || ''}')"
+        <div style="background:var(--bg2);padding:14px 12px"
              onmouseover="this.style.background='var(--bg3)'"
              onmouseout="this.style.background='var(--bg2)'">
           <div style="font-size:9px;color:var(--text2);letter-spacing:1px;margin-bottom:6px">${d.navn}</div>
@@ -1680,31 +1680,36 @@ async function lastMarkedsOversikt() {
     }).join("");
 
     const now = new Date();
-    introEl.innerHTML = `<div style="font-size:10px;color:var(--text2)">
-      Last updated: ${now.toLocaleTimeString()} &nbsp;·&nbsp; Click any instrument to run full analysis
-    </div>`;
+    introEl.innerHTML = `<div style="font-size:10px;color:var(--text2)">Last updated: ${now.toLocaleTimeString()}</div>`;
 
-    // Build summary for AI
-    const summary = data.map(d =>
-      `${d.navn}: ${d.verdi} (${d.endring >= 0 ? '+' : ''}${d.endring.toFixed(2)}%)`
-    ).join(", ");
+    lagTVMini("tv-gold",   "OANDA:XAUUSD");
+    lagTVMini("tv-eurusd", "OANDA:EURUSD");
 
-    // Call AI briefing
-    const aiRes = await fetch("/api/markeds_oversikt", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({makro: summary})
-    });
-    const aiData = await aiRes.json();
-    if (aiData.ai) {
-      const html = aiData.ai
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\n/g, "<br>");
-      aiEl.innerHTML = html;
-    } else {
-      aiEl.innerHTML = `<span style="color:var(--text2)">${aiData.error || "No briefing available."}</span>`;
-    }
   } catch(e) {
+    introEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+function lagTVMini(containerId, symbol) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = "";
+  const script = document.createElement("script");
+  script.src = "https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js";
+  script.async = true;
+  script.innerHTML = JSON.stringify({
+    symbol: symbol,
+    width: "100%",
+    height: 300,
+    locale: "en",
+    dateRange: "3M",
+    colorTheme: "dark",
+    isTransparent: true,
+    autosize: true
+  });
+  el.appendChild(script);
+}
+
     aiEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
   }
 }
