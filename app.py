@@ -20,6 +20,9 @@ warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
 
+# Clear stale cache on startup
+_cache.clear()
+
 RISIKOFRI_RENTE = 0.045
 BENCHMARK       = "^GSPC"
 GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
