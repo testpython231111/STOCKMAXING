@@ -2,7 +2,7 @@
 Aksjeanalyse PRO — Flask Web App
 """
 
-import os, io, base64, warnings, json, gc, time
+import os, io, base64, warnings, json, gc, time, logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
@@ -19,10 +19,11 @@ import requests as _requests
 warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 RISIKOFRI_RENTE = 0.045
 BENCHMARK       = "^GSPC"
-GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
 
 MAKRO_TICKERS = {
     "S&P 500":       "^GSPC",
@@ -39,7 +40,6 @@ MAKRO_TICKERS = {
 _cache = {}
 _cache_lock = Lock()
 CACHE_TTL = 300  # 5 minutes
-_cache.clear()  # Clear stale cache on startup
 
 def cache_get(key):
     with _cache_lock:
@@ -84,9 +84,9 @@ def stor_tall(n):
         return f"{n:.2f}"
     except: return "N/A"
 
-def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
-    key = api_key or GEMINI_API_KEY
-    if not key: return "No Gemini API key provided."
+def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
+    key = api_key or os.environ.get("GEMINI_API_KEY", "")
+    if not key: return "No API key configured."
     try:
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
         headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
@@ -102,7 +102,8 @@ def spør_groq(prompt: str, api_key: str, maks=1200) -> str:
         r.raise_for_status()
         return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     except Exception as e:
-        return f"Gemini error: {e}"
+        logger.error(f"[AI] API error: {e}")
+        return f"AI error: {e}"
 
 # ── Teknisk analyse ───────────────────────────────────────────────────────────
 
@@ -189,77 +190,90 @@ def beregn_risiko(df, bm_df):
 # ── Graf → base64 ─────────────────────────────────────────────────────────────
 
 def lag_graf(df: pd.DataFrame, ticker: str) -> str:
-    plt.style.use("dark_background")
-    fig = plt.figure(figsize=(16, 12), facecolor="#06090F")
-    gs  = gridspec.GridSpec(4, 2, figure=fig, hspace=0.5, wspace=0.3)
-    C   = {"kurs":"#4A9ED6","sma20":"#F0B429","sma50":"#64B5F6",
-           "sma200":"#E05470","bull":"#4A9ED6","bear":"#E05470","text":"#7A92B0"}
+    style = {
+        "axes.facecolor":  "#06090F",
+        "figure.facecolor":"#06090F",
+        "axes.edgecolor":  "#1A2D45",
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "xtick.color":     "#7A92B0",
+        "ytick.color":     "#7A92B0",
+        "text.color":      "#7A92B0",
+        "grid.color":      "#1A2D45",
+        "grid.linestyle":  "--",
+        "grid.alpha":      0.3,
+    }
+    with matplotlib.rc_context(style):
+        fig = plt.figure(figsize=(16, 12), facecolor="#06090F")
+        gs  = gridspec.GridSpec(4, 2, figure=fig, hspace=0.5, wspace=0.3)
+        C   = {"kurs":"#4A9ED6","sma20":"#F0B429","sma50":"#64B5F6",
+               "sma200":"#E05470","bull":"#4A9ED6","bear":"#E05470","text":"#7A92B0"}
 
-    ax1 = fig.add_subplot(gs[0,:])
-    ax1.set_facecolor("#06090F")
-    ax1.plot(df.index, df["Close"],  color=C["kurs"],  lw=1.5, label="Kurs")
-    ax1.plot(df.index, df["SMA20"],  color=C["sma20"], lw=0.8, ls="--", label="SMA20")
-    ax1.plot(df.index, df["SMA50"],  color=C["sma50"], lw=0.8, ls="--", label="SMA50")
-    ax1.plot(df.index, df["SMA200"], color=C["sma200"],lw=0.8, ls="--", label="SMA200")
-    ax1.fill_between(df.index, df["BB_Up"], df["BB_Lo"],
-                     alpha=0.05, color=C["kurs"])
-    ax1.set_title(f"{ticker} — Kurs & Indikatorer", color=C["text"], fontsize=10)
-    ax1.legend(fontsize=7, labelcolor=C["text"])
-    ax1.tick_params(colors=C["text"]); ax1.spines[:].set_color("#1A2D45")
+        ax1 = fig.add_subplot(gs[0,:])
+        ax1.set_facecolor("#06090F")
+        ax1.plot(df.index, df["Close"],  color=C["kurs"],  lw=1.5, label="Kurs")
+        ax1.plot(df.index, df["SMA20"],  color=C["sma20"], lw=0.8, ls="--", label="SMA20")
+        ax1.plot(df.index, df["SMA50"],  color=C["sma50"], lw=0.8, ls="--", label="SMA50")
+        ax1.plot(df.index, df["SMA200"], color=C["sma200"],lw=0.8, ls="--", label="SMA200")
+        ax1.fill_between(df.index, df["BB_Up"], df["BB_Lo"],
+                         alpha=0.05, color=C["kurs"])
+        ax1.set_title(f"{ticker} — Kurs & Indikatorer", color=C["text"], fontsize=10)
+        ax1.legend(fontsize=7, labelcolor=C["text"])
+        ax1.tick_params(colors=C["text"]); ax1.spines[:].set_color("#1A2D45")
 
-    ax2 = fig.add_subplot(gs[1,:])
-    ax2.set_facecolor("#06090F")
-    fc = [C["bull"] if df["Close"].iloc[i]>=df["Close"].iloc[i-1] else C["bear"]
-          for i in range(1,len(df))]
-    ax2.bar(df.index[1:], df["Volume"].iloc[1:], color=fc, alpha=0.6, width=1)
-    ax2.plot(df.index, df["Vol_SMA20"], color=C["sma20"], lw=0.8, ls="--")
-    ax2.set_title("Volume", color=C["text"], fontsize=10)
-    ax2.tick_params(colors=C["text"]); ax2.spines[:].set_color("#1A2D45")
+        ax2 = fig.add_subplot(gs[1,:])
+        ax2.set_facecolor("#06090F")
+        fc = [C["bull"] if df["Close"].iloc[i]>=df["Close"].iloc[i-1] else C["bear"]
+              for i in range(1,len(df))]
+        ax2.bar(df.index[1:], df["Volume"].iloc[1:], color=fc, alpha=0.6, width=1)
+        ax2.plot(df.index, df["Vol_SMA20"], color=C["sma20"], lw=0.8, ls="--")
+        ax2.set_title("Volume", color=C["text"], fontsize=10)
+        ax2.tick_params(colors=C["text"]); ax2.spines[:].set_color("#1A2D45")
 
-    ax3 = fig.add_subplot(gs[2,0])
-    ax3.set_facecolor("#06090F")
-    ax3.plot(df.index, df["RSI"], color="#f4a261", lw=1.2)
-    ax3.axhline(70, color=C["bear"], ls="--", lw=0.7, alpha=0.6)
-    ax3.axhline(30, color=C["bull"], ls="--", lw=0.7, alpha=0.6)
-    ax3.fill_between(df.index, df["RSI"], 70, where=df["RSI"]>=70, alpha=0.1, color=C["bear"])
-    ax3.fill_between(df.index, df["RSI"], 30, where=df["RSI"]<=30, alpha=0.1, color=C["bull"])
-    ax3.set_ylim(0,100); ax3.set_title("RSI (14d)", color=C["text"], fontsize=10)
-    ax3.tick_params(colors=C["text"]); ax3.spines[:].set_color("#1A2D45")
+        ax3 = fig.add_subplot(gs[2,0])
+        ax3.set_facecolor("#06090F")
+        ax3.plot(df.index, df["RSI"], color="#f4a261", lw=1.2)
+        ax3.axhline(70, color=C["bear"], ls="--", lw=0.7, alpha=0.6)
+        ax3.axhline(30, color=C["bull"], ls="--", lw=0.7, alpha=0.6)
+        ax3.fill_between(df.index, df["RSI"], 70, where=df["RSI"]>=70, alpha=0.1, color=C["bear"])
+        ax3.fill_between(df.index, df["RSI"], 30, where=df["RSI"]<=30, alpha=0.1, color=C["bull"])
+        ax3.set_ylim(0,100); ax3.set_title("RSI (14d)", color=C["text"], fontsize=10)
+        ax3.tick_params(colors=C["text"]); ax3.spines[:].set_color("#1A2D45")
 
-    ax4 = fig.add_subplot(gs[2,1])
-    ax4.set_facecolor("#06090F")
-    ax4.plot(df.index, df["MACD"],   color=C["sma50"], lw=1.2, label="MACD")
-    ax4.plot(df.index, df["MACD_S"], color=C["sma20"], lw=1.0, ls="--", label="Signal")
-    hc = [C["bull"] if v>=0 else C["bear"] for v in df["MACD_H"]]
-    ax4.bar(df.index, df["MACD_H"], color=hc, alpha=0.5, width=1)
-    ax4.set_title("MACD", color=C["text"], fontsize=10)
-    ax4.legend(fontsize=7, labelcolor=C["text"])
-    ax4.tick_params(colors=C["text"]); ax4.spines[:].set_color("#1A2D45")
+        ax4 = fig.add_subplot(gs[2,1])
+        ax4.set_facecolor("#06090F")
+        ax4.plot(df.index, df["MACD"],   color=C["sma50"], lw=1.2, label="MACD")
+        ax4.plot(df.index, df["MACD_S"], color=C["sma20"], lw=1.0, ls="--", label="Signal")
+        hc = [C["bull"] if v>=0 else C["bear"] for v in df["MACD_H"]]
+        ax4.bar(df.index, df["MACD_H"], color=hc, alpha=0.5, width=1)
+        ax4.set_title("MACD", color=C["text"], fontsize=10)
+        ax4.legend(fontsize=7, labelcolor=C["text"])
+        ax4.tick_params(colors=C["text"]); ax4.spines[:].set_color("#1A2D45")
 
-    ax5 = fig.add_subplot(gs[3,0])
-    ax5.set_facecolor("#06090F")
-    rm = df["Close"].cummax()
-    dd = (df["Close"]-rm)/rm*100
-    ax5.fill_between(df.index, dd, 0, color=C["bear"], alpha=0.5)
-    ax5.plot(df.index, dd, color=C["bear"], lw=0.8)
-    ax5.set_title("Drawdown (%)", color=C["text"], fontsize=10)
-    ax5.tick_params(colors=C["text"]); ax5.spines[:].set_color("#1A2D45")
+        ax5 = fig.add_subplot(gs[3,0])
+        ax5.set_facecolor("#06090F")
+        rm = df["Close"].cummax()
+        dd = (df["Close"]-rm)/rm*100
+        ax5.fill_between(df.index, dd, 0, color=C["bear"], alpha=0.5)
+        ax5.plot(df.index, dd, color=C["bear"], lw=0.8)
+        ax5.set_title("Drawdown (%)", color=C["text"], fontsize=10)
+        ax5.tick_params(colors=C["text"]); ax5.spines[:].set_color("#1A2D45")
 
-    ax6 = fig.add_subplot(gs[3,1])
-    ax6.set_facecolor("#06090F")
-    dagret = df["Close"].pct_change().dropna()*100
-    ax6.hist(dagret, bins=50, color=C["sma50"], alpha=0.6, edgecolor="none")
-    ax6.axvline(dagret.mean(), color=C["sma20"], lw=1.2, ls="--")
-    ax6.axvline(np.percentile(dagret,5), color=C["bear"], lw=1.0, ls=":")
-    ax6.set_title("Return Distribution", color=C["text"], fontsize=10)
-    ax6.tick_params(colors=C["text"]); ax6.spines[:].set_color("#1A2D45")
+        ax6 = fig.add_subplot(gs[3,1])
+        ax6.set_facecolor("#06090F")
+        dagret = df["Close"].pct_change().dropna()*100
+        ax6.hist(dagret, bins=50, color=C["sma50"], alpha=0.6, edgecolor="none")
+        ax6.axvline(dagret.mean(), color=C["sma20"], lw=1.2, ls="--")
+        ax6.axvline(np.percentile(dagret,5), color=C["bear"], lw=1.0, ls=":")
+        ax6.set_title("Return Distribution", color=C["text"], fontsize=10)
+        ax6.tick_params(colors=C["text"]); ax6.spines[:].set_color("#1A2D45")
 
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=120, bbox_inches="tight", facecolor="#06090F")
-    plt.close("all")
-    gc.collect()
-    buf.seek(0)
-    return "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=120, bbox_inches="tight", facecolor="#06090F")
+        plt.close(fig)
+        gc.collect()
+        buf.seek(0)
+        return "data:image/png;base64," + base64.b64encode(buf.read()).decode()
 
 # ── Flask ruter ───────────────────────────────────────────────────────────────
 
@@ -389,10 +403,10 @@ def api_chart():
 
 @app.route("/api/ai_analyse", methods=["POST"])
 def api_ai_analyse():
-    data     = request.json
-    ticker   = data.get("ticker","").strip().upper()
-    periode  = data.get("periode","1y")
-    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
+    data       = request.json
+    ticker     = data.get("ticker","").strip().upper()
+    periode    = data.get("periode","1y")
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
     if not ticker:
         return safe_jsonify({"error": "No ticker"}), 400
@@ -400,34 +414,55 @@ def api_ai_analyse():
         return safe_jsonify({"error": "No API key configured"}), 400
 
     try:
-        aksje = yf.Ticker(ticker)
-        df    = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
-        if df.empty:
-            return safe_jsonify({"error": f"No data for {ticker}"}), 404
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        info = aksje.info
-        df   = beregn_tekniske(df)
-        sig  = hent_signaler(df)
+        # Re-use cached data from /api/analyse to avoid duplicate downloads
+        cache_key = f"analyse:{ticker}:{periode}"
+        cached = cache_get(cache_key)
 
-        bm_df = df.copy()
-        try:
-            _bm = yf.download(BENCHMARK, period=periode, progress=False, auto_adjust=True)
-            if not _bm.empty:
-                if isinstance(_bm.columns, pd.MultiIndex): _bm.columns = _bm.columns.get_level_values(0)
-                bm_df = _bm
-        except: pass
-        ri = beregn_risiko(df, bm_df)
+        if cached:
+            fundamental = cached.get("fundamental", {})
+            sig         = cached.get("signaler", {})
+            ri          = cached.get("risiko", {})
+            # For AI we need the raw yf.Ticker for insider/earnings/options context
+            aksje = yf.Ticker(ticker)
+            info_full = aksje.info
+        else:
+            # Cache miss — fetch fresh (runs in parallel with benchmark)
+            aksje = yf.Ticker(ticker)
+            def fetch_stock():
+                df = yf.download(ticker, period=periode, progress=False, auto_adjust=True)
+                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+                return df
+            def fetch_bm():
+                try:
+                    bm = yf.download(BENCHMARK, period=periode, progress=False, auto_adjust=True)
+                    if isinstance(bm.columns, pd.MultiIndex): bm.columns = bm.columns.get_level_values(0)
+                    return bm
+                except Exception as e:
+                    logger.warning(f"[ai_analyse] benchmark fetch failed: {e}")
+                    return None
+            with ThreadPoolExecutor(max_workers=2) as ex:
+                f_df = ex.submit(fetch_stock)
+                f_bm = ex.submit(fetch_bm)
+                df   = f_df.result()
+                bm   = f_bm.result()
+            if df.empty:
+                return safe_jsonify({"error": f"No data for {ticker}"}), 404
+            info_full = aksje.info
+            df  = beregn_tekniske(df)
+            sig = hent_signaler(df)
+            bm_df = bm if (bm is not None and not bm.empty) else df.copy()
+            ri  = beregn_risiko(df, bm_df)
+            fundamental = {
+                "pe":           safe(info_full.get("trailingPE")),
+                "forward_pe":   safe(info_full.get("forwardPE")),
+                "mktcap":       stor_tall(info_full.get("marketCap")),
+                "roe":          safe(info_full.get("returnOnEquity"), pst=True),
+                "driftsmargin": safe(info_full.get("operatingMargins"), pst=True),
+                "konsensus":    info_full.get("recommendationKey","N/A").upper(),
+                "navn":         info_full.get("longName", ticker),
+            }
 
-        fundamental = {
-            "pe":           safe(info.get("trailingPE")),
-            "forward_pe":   safe(info.get("forwardPE")),
-            "mktcap":       stor_tall(info.get("marketCap")),
-            "roe":          safe(info.get("returnOnEquity"), pst=True),
-            "driftsmargin": safe(info.get("operatingMargins"), pst=True),
-            "konsensus":    info.get("recommendationKey","N/A").upper(),
-            "navn":         info.get("longName", ticker),
-        }
+        info = info_full
 
         analyst_ctx = ""
         try:
@@ -443,7 +478,8 @@ def api_ai_analyse():
             sell        = info.get("numberOfSellOpinions", 0) or info.get("sell", 0)
             strong_sell = info.get("numberOfStrongSellOpinions", 0) or info.get("strongSell", 0)
             analyst_ctx = f"Analyst consensus: {n_analysts} analysts — StrongBuy={strong_buy}, Buy={buy}, Hold={hold}, Sell={sell}, StrongSell={strong_sell}. Price targets: Low={target_low}, Mean={target_mean}, High={target_high}. Upside to mean target: {upside}%."
-        except: pass
+        except Exception as e:
+            logger.warning(f"[ai_analyse] analyst context: {e}")
 
         insider_ctx = ""
         try:
@@ -452,11 +488,11 @@ def api_ai_analyse():
                 ins = ins.head(10)
                 buys  = sum(1 for _, r in ins.iterrows() if "buy" in str(r.get("Transaction","")).lower() or "purchase" in str(r.get("Transaction","")).lower())
                 sells = len(ins) - buys
-                recent = []
-                for _, r in ins.head(5).iterrows():
-                    recent.append(f"{str(r.get('Insider',''))[:20]} ({str(r.get('Position',''))[:15]}): {str(r.get('Transaction',''))}")
+                recent = [f"{str(r.get('Insider',''))[:20]} ({str(r.get('Position',''))[:15]}): {str(r.get('Transaction',''))}"
+                          for _, r in ins.head(5).iterrows()]
                 insider_ctx = f"Insider activity (last 10): {buys} buys, {sells} sells. Recent: {'; '.join(recent)}."
-        except: pass
+        except Exception as e:
+            logger.warning(f"[ai_analyse] insider context: {e}")
 
         earnings_ctx = ""
         try:
@@ -477,12 +513,13 @@ def api_ai_analyse():
                         if float(actual) >= float(est): beats += 1
                         else: misses += 1
                 earnings_ctx += f" Last 4 quarters: {beats} EPS beats, {misses} misses."
-        except: pass
+        except Exception as e:
+            logger.warning(f"[ai_analyse] earnings context: {e}")
 
         short_ctx = ""
         try:
             short_pct    = info.get("shortPercentOfFloat")
-            short_ratio  = info.get("shortRatio")          # days to cover
+            short_ratio  = info.get("shortRatio")
             shares_short = info.get("sharesShort")
             shares_short_prev = info.get("sharesShortPriorMonth")
             if short_pct is not None:
@@ -492,13 +529,13 @@ def api_ai_analyse():
                     chg = (shares_short - shares_short_prev) / shares_short_prev * 100
                     change_str = f", changed {'+' if chg>=0 else ''}{round(chg,1)}% vs prior month"
                 short_ctx = f"Short interest: {short_pct_str} of float shorted, days-to-cover={short_ratio}{change_str}."
-        except: pass
+        except Exception as e:
+            logger.warning(f"[ai_analyse] short context: {e}")
 
         options_ctx = ""
         try:
             exps = aksje.options
             if exps:
-                # Use nearest expiration for ATM data, aggregate across first 4 for flow
                 all_call_vol, all_put_vol, all_call_oi, all_put_oi = 0, 0, 0, 0
                 for exp in exps[:4]:
                     try:
@@ -507,26 +544,25 @@ def api_ai_analyse():
                         all_put_vol  += chain.puts['volume'].fillna(0).sum()
                         all_call_oi  += chain.calls['openInterest'].fillna(0).sum()
                         all_put_oi   += chain.puts['openInterest'].fillna(0).sum()
-                    except: pass
-
+                    except Exception as e:
+                        logger.warning(f"[ai_analyse] options chain {exp}: {e}")
                 pc_vol = round(all_put_vol / max(all_call_vol, 1), 2)
                 pc_oi  = round(all_put_oi  / max(all_call_oi,  1), 2)
-
-                # ATM IV from nearest expiry
                 atm_iv_str = ""
                 try:
-                    chain0 = aksje.option_chain(exps[0])
+                    chain0    = aksje.option_chain(exps[0])
                     cur_price = info.get("currentPrice") or info.get("regularMarketPrice", 100)
-                    calls = chain0.calls.dropna(subset=['impliedVolatility'])
-                    atm   = calls.iloc[(calls['strike'] - cur_price).abs().argsort()[:1]]
-                    atm_iv = round(float(atm['impliedVolatility'].values[0]) * 100, 1)
+                    calls     = chain0.calls.dropna(subset=['impliedVolatility'])
+                    atm       = calls.iloc[(calls['strike'] - cur_price).abs().argsort()[:1]]
+                    atm_iv    = round(float(atm['impliedVolatility'].values[0]) * 100, 1)
                     atm_iv_str = f", ATM implied volatility={atm_iv}%"
-                except: pass
-
-                sentiment = "bearish" if pc_vol > 1.2 else "bullish" if pc_vol < 0.7 else "neutral"
+                except Exception as e:
+                    logger.warning(f"[ai_analyse] ATM IV: {e}")
+                sentiment   = "bearish" if pc_vol > 1.2 else "bullish" if pc_vol < 0.7 else "neutral"
                 options_ctx = (f"Options flow (next 4 expirations): Put/Call volume ratio={pc_vol} ({sentiment} sentiment), "
                                f"Put/Call OI ratio={pc_oi}{atm_iv_str}.")
-        except: pass
+        except Exception as e:
+            logger.warning(f"[ai_analyse] options context: {e}")
 
         prompt = f"""
 You are a senior equity analyst at a professional investment firm. Provide a rigorous investment assessment for {fundamental['navn']} ({ticker}).
@@ -553,10 +589,11 @@ Structure your response exactly as follows:
 
 Max 320 words. Be specific, data-driven, and direct. Avoid generic statements.
 """
-        ai_tekst = spør_groq(prompt, gemini_key, 1500)
+        ai_tekst = spør_ai(prompt, gemini_key, 1500)
         return safe_jsonify({"ai": ai_tekst})
 
     except Exception as e:
+        logger.error(f"[api_ai_analyse] {ticker}: {e}")
         return safe_jsonify({"error": str(e)}), 500
 
 @app.route("/api/short_interest", methods=["POST"])
@@ -734,7 +771,7 @@ Write a concise professional market briefing covering:
 
 Keep it professional, data-driven, and concise. Max 300 words.
 """
-        ai_tekst = spør_groq(prompt, gemini_key, 1200)
+        ai_tekst = spør_ai(prompt, gemini_key, 1200)
         return safe_jsonify({"ai": ai_tekst})
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
@@ -1015,7 +1052,7 @@ def api_sammenlign():
     data     = request.json
     tickers  = data.get("tickers", [])
     periode  = data.get("periode", "1y")
-    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
     resultat = []
 
     # Download benchmark once outside the loop
@@ -1111,7 +1148,7 @@ Your analysis must cover:
 
 Be decisive. A client is making a real allocation decision. Max 300 words.
 """
-        ai_tekst = spør_groq(prompt, gemini_key, 1200)
+        ai_tekst = spør_ai(prompt, gemini_key, 1200)
 
     return safe_jsonify({"aksjer": resultat, "ai": ai_tekst})
 
@@ -1119,7 +1156,7 @@ Be decisive. A client is making a real allocation decision. Max 300 words.
 def api_portefolje_analyse():
     data       = request.json
     posisjoner = data.get("posisjoner", [])
-    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
     if not posisjoner:
         return safe_jsonify({"error": "No positions provided"}), 400
@@ -1219,7 +1256,7 @@ Provide a professional portfolio review:
 
 Be direct and action-oriented. This client needs clear guidance. Max 380 words.
 """
-        ai_tekst = spør_groq(prompt, gemini_key, 1500)
+        ai_tekst = spør_ai(prompt, gemini_key, 1500)
 
     return safe_jsonify({
         "posisjoner":     resultat,
@@ -1235,7 +1272,7 @@ Be direct and action-oriented. This client needs clear guidance. Max 380 words.
 def api_nyheter():
     data     = request.json
     ticker   = data.get("ticker","").strip().upper()
-    gemini_key = os.environ.get("GEMINI_API_KEY", data.get("gemini_key",""))
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
     try:
@@ -1280,7 +1317,7 @@ Provide:
 
 Max 120 words. Focus on what actually moves the stock price.
 """
-            ai_sentiment = spør_groq(prompt, gemini_key, 400)
+            ai_sentiment = spør_ai(prompt, gemini_key, 400)
 
         return safe_jsonify({"nyheter": resultat, "ai_sentiment": ai_sentiment})
     except Exception as e:
