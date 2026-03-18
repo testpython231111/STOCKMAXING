@@ -326,6 +326,93 @@
   .sig-val   { font-size: 14px; font-weight: 500; }
   .sig-sub   { font-size: 9px; color: var(--text2); margin-top: 2px; }
 
+  /* ── Margin of Safety widget ── */
+  .mos-widget {
+    margin: 10px 0 0 0;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    padding: 12px 16px;
+  }
+  .mos-header-row {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .mos-badge {
+    font-size: 10px; letter-spacing: 2px; font-weight: 600;
+    padding: 4px 14px; border: 1px solid; white-space: nowrap;
+  }
+  .mos-badge.strong-buy   { color:#4A9ED6; border-color:#4A9ED6; background:rgba(74,158,214,0.10); }
+  .mos-badge.undervalued  { color:#64B5F6; border-color:#64B5F6; background:rgba(100,181,246,0.08); }
+  .mos-badge.fair         { color:#F0B429; border-color:#F0B429; background:rgba(240,180,41,0.08); }
+  .mos-badge.overvalued   { color:#E05470; border-color:#E05470; background:rgba(224,84,112,0.08); }
+  .mos-badge.strong-sell  { color:#c0392b; border-color:#c0392b; background:rgba(192,57,43,0.10); }
+  .mos-score-label { font-size:9px; color:var(--text2); letter-spacing:1px; }
+  .mos-score-bar-wrap {
+    flex:1; min-width:140px; max-width:280px;
+    height:6px; background:var(--border); border-radius:3px; overflow:hidden;
+  }
+  .mos-score-bar { height:100%; border-radius:3px; transition: width 0.6s ease; }
+  .mos-signals {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 6px;
+  }
+  .mos-signal-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2); border: 1px solid var(--border);
+    padding: 5px 9px; font-size: 10px;
+  }
+  .mos-signal-key { color: var(--text2); font-size: 9px; letter-spacing: 0.5px; }
+  .mos-signal-val { font-weight: 500; white-space: nowrap; }
+  .mos-signal-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-left: 6px;
+  }
+  .dot-bull { background: var(--green); }
+  .dot-neu  { background: var(--yellow); }
+  .dot-bear { background: var(--red); }
+  .mos-dcf-pending { font-size:9px; color:var(--text2); font-style:italic; }
+
+  /* ── Margin of Safety ── */
+  .mos-overall {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 14px 18px; margin-bottom: 16px;
+    border-radius: 2px; border: 1px solid var(--border);
+  }
+  .mos-overall.green { border-left: 4px solid var(--green); background: rgba(74,158,214,0.06); }
+  .mos-overall.yellow { border-left: 4px solid var(--yellow); background: rgba(240,180,41,0.06); }
+  .mos-overall.red { border-left: 4px solid var(--red); background: rgba(224,84,112,0.06); }
+  .mos-verdict {
+    font-size: 18px; font-weight: 600; letter-spacing: 2px; white-space: nowrap;
+  }
+  .mos-verdict.green { color: var(--green); }
+  .mos-verdict.yellow { color: var(--yellow); }
+  .mos-verdict.red { color: var(--red); }
+  .mos-signal-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px; margin-bottom: 16px;
+  }
+  .mos-signal {
+    background: var(--bg3); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 2px;
+    border-left: 3px solid var(--border);
+  }
+  .mos-signal.green { border-left-color: var(--green); }
+  .mos-signal.yellow { border-left-color: var(--yellow); }
+  .mos-signal.red { border-left-color: var(--red); }
+  .mos-signal-method { font-size: 9px; letter-spacing: 2px; color: var(--text2); margin-bottom: 5px; }
+  .mos-signal-verdict { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+  .mos-signal-verdict.green { color: var(--green); }
+  .mos-signal-verdict.yellow { color: var(--yellow); }
+  .mos-signal-verdict.red { color: var(--red); }
+  .mos-signal-note { font-size: 10px; color: var(--text2); line-height: 1.5; }
+  /* Fundamental tab MoS pill */
+  .mos-pill {
+    display: inline-block; padding: 2px 10px; border-radius: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 1px;
+  }
+  .mos-pill.green { background: rgba(74,158,214,0.15); color: var(--green); border: 1px solid var(--green2); }
+  .mos-pill.yellow { background: rgba(240,180,41,0.12); color: var(--yellow); border: 1px solid var(--yellow); }
+  .mos-pill.red { background: rgba(224,84,112,0.12); color: var(--red); border: 1px solid var(--red); }
+
   /* ── DCF panel ── */
   .dcf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
   @media(max-width:700px) { .dcf-grid { grid-template-columns: 1fr; } }
@@ -1448,14 +1535,85 @@ async function lastDCF(ticker) {
         <td>${d.currency === 'NOK' ? 'kr' : '$'}${r.pv}B</td>
       </tr>`).join("");
 
+    // ── MoS overall + signals ────────────────────────────────────────────
+    const mos     = d.mos || [];
+    const mosOver = d.mosOverall || {verdict:"N/A", color:"yellow", desc:""};
+
+    const mosSignalsHtml = mos.map(s => `
+      <div class="mos-signal ${s.color}">
+        <div class="mos-signal-method">${s.method}</div>
+        <div class="mos-signal-verdict ${s.color}">${s.verdict}</div>
+        ${s.iv   ? `<div style="font-size:11px;color:var(--text3);margin-bottom:2px">${fmtIV(s.iv)}${s.upside !== null && s.upside !== undefined ? ` <span class="${upsideClass(s.upside)}">(${s.upside >= 0 ? '+' : ''}${s.upside}%)</span>` : ''}</div>` : ''}
+        ${s.peg  ? `<div style="font-size:11px;color:var(--text3);margin-bottom:2px">PEG: ${s.peg}</div>` : ''}
+        ${s.multiple ? `<div style="font-size:11px;color:var(--text3);margin-bottom:2px">${s.multiple}x vs ${s.sector_median}x sector median</div>` : ''}
+        <div class="mos-signal-note">${s.note}</div>
+      </div>`).join("");
+
+    // ── Also fill Fundamental tab MoS section ───────────────────────────
+    const fundMos = document.getElementById("fund-mos-body");
+    if (fundMos) {
+      if (!mos.length) {
+        fundMos.innerHTML = `<span style="color:var(--text2)">Insufficient data — needs positive FCF, EPS, and book value.</span>`;
+      } else {
+        const colorVar = {green:"var(--green)", yellow:"var(--yellow)", red:"var(--red)"};
+        fundMos.innerHTML = `
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:9px;color:var(--text2)">OVERALL:</span>
+            <span class="mos-pill ${mosOver.color}">${mosOver.verdict}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px">
+            ${mos.map(s => `
+              <div style="display:flex;justify-content:space-between;align-items:baseline;
+                          padding:5px 8px;background:var(--bg2);border:1px solid var(--border);
+                          border-left:2px solid ${colorVar[s.color]||'var(--border)'}">
+                <span style="font-size:9px;color:var(--text2);letter-spacing:1px">${s.method}</span>
+                <div style="text-align:right">
+                  <span style="font-size:10px;font-weight:600;color:${colorVar[s.color]}">${s.verdict}</span>
+                  ${s.upside !== null && s.upside !== undefined
+                    ? `<span style="font-size:9px;color:var(--text2);margin-left:4px">${s.upside >= 0 ? '+' : ''}${s.upside}%</span>`
+                    : s.peg !== undefined && s.peg !== null
+                    ? `<span style="font-size:9px;color:var(--text2);margin-left:4px">PEG ${s.peg}</span>`
+                    : s.multiple !== undefined
+                    ? `<span style="font-size:9px;color:var(--text2);margin-left:4px">${s.multiple}x</span>`
+                    : ''}
+                </div>
+              </div>`).join("")}
+          </div>
+          <div style="margin-top:8px;font-size:9px;color:var(--text2)">
+            Click the <strong style="color:var(--green2)">DCF</strong> tab for the full breakdown with sensitivity matrix.
+          </div>`;
+      }
+    }
+
     // ── Render ───────────────────────────────────────────────────────────
     const sc   = d.scenarios;
     const base = sc.Base;
     const bear = sc.Bear;
     const bull = sc.Bull;
 
+    // ── Update MoS widget with DCF upside now that we have it ────────────
+    if (window._mosF && base.upside !== null && base.upside !== undefined) {
+      beregnMoS(window._mosF, base.upside);
+    }
+
     pane.innerHTML = `
       <div style="padding:14px">
+
+        <!-- MoS Overall verdict -->
+        <div class="dcf-section-title">▸ MARGIN OF SAFETY — OVERALL ASSESSMENT</div>
+        <div class="mos-overall ${mosOver.color}">
+          <div>
+            <div style="font-size:9px;color:var(--text2);letter-spacing:2px;margin-bottom:5px">VALUATION VERDICT</div>
+            <div class="mos-verdict ${mosOver.color}">${mosOver.verdict}</div>
+          </div>
+          <div style="width:1px;height:36px;background:var(--border);flex-shrink:0"></div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.6;font-family:'IBM Plex Sans',sans-serif">${mosOver.desc}</div>
+        </div>
+
+        <!-- MoS signal grid -->
+        <div class="mos-signal-grid" style="margin-bottom:20px">
+          ${mosSignalsHtml || `<div style="color:var(--text2);font-size:11px;padding:10px">Insufficient data for MoS signals.</div>`}
+        </div>
 
         <!-- Current price bar -->
         <div class="dcf-current-bar">
@@ -1615,6 +1773,163 @@ async function lastAI(ticker, periode) {
 }
 
 // ── Vis resultat ──────────────────────────────────────────────────────────────
+// ── Margin of Safety ─────────────────────────────────────────────────────────
+// Scoring: each signal gives -2 / -1 / 0 / +1 / +2
+// Total score mapped to verdict: STRONG BUY / UNDERVALUED / FAIR / OVERVALUED / STRONG SELL
+window._mosState = { signals: {}, dcfUpside: null };
+
+function beregnMoS(f, dcfUpside = null) {
+  const el = document.getElementById("mosWidget");
+  if (!el) return;
+
+  const price   = parseFloat(f._pris_raw);
+  const pe      = parseFloat(f._pe_raw);
+  const eps     = parseFloat(f._eps_raw);
+  const pb      = parseFloat(f._pb_raw);
+  const hi52    = parseFloat(f._52u_høy_raw);
+  const lo52    = parseFloat(f._52u_lav_raw);
+  const target  = parseFloat(f._mål_raw);
+  const peg     = parseFloat(f._peg_raw);
+  const evEb    = parseFloat(f._evEbitda_raw);
+  const egrw    = parseFloat(f._earnings_growth); // e.g. 0.12 = 12%
+  const konsens = (f.konsensus || "").toLowerCase();
+
+  const signals = [];
+  let totalScore = 0;
+  let scoredCount = 0;
+
+  function addSignal(key, label, value, score, display) {
+    // score: +2 strong bull, +1 bull, 0 neutral, -1 bear, -2 strong bear
+    signals.push({ key, label, value, score, display });
+    totalScore += score;
+    scoredCount++;
+  }
+
+  // ── 1. Graham Number ──────────────────────────────────────────────────────
+  if (eps > 0 && pb > 0 && price > 0) {
+    const bvps      = price / pb;                          // book value/share
+    const graham    = Math.sqrt(22.5 * eps * bvps);
+    const grahamPct = ((graham - price) / price * 100);
+    const grahamFmt = `$${graham.toFixed(2)} (${grahamPct >= 0 ? '+' : ''}${grahamPct.toFixed(1)}%)`;
+    const sc = grahamPct > 30 ? 2 : grahamPct > 10 ? 1 : grahamPct > -10 ? 0 : grahamPct > -30 ? -1 : -2;
+    addSignal("graham", "Graham Number", grahamPct, sc, grahamFmt);
+  }
+
+  // ── 2. PEG Ratio ──────────────────────────────────────────────────────────
+  if (!isNaN(peg) && peg > 0) {
+    const pegFmt = peg.toFixed(2);
+    const sc = peg < 0.8 ? 2 : peg < 1.2 ? 1 : peg < 2.0 ? 0 : peg < 3.0 ? -1 : -2;
+    addSignal("peg", "PEG Ratio", peg, sc, `${pegFmt} ${peg < 1 ? '(undervalued)' : peg < 2 ? '(fair)' : '(expensive)'}`);
+  } else if (!isNaN(pe) && pe > 0 && !isNaN(egrw) && egrw > 0) {
+    // Fallback: compute PEG from PE / (growth*100)
+    const pegCalc = pe / (egrw * 100);
+    const sc = pegCalc < 0.8 ? 2 : pegCalc < 1.2 ? 1 : pegCalc < 2.0 ? 0 : pegCalc < 3.0 ? -1 : -2;
+    addSignal("peg", "PEG (calc.)", pegCalc, sc, `${pegCalc.toFixed(2)} ${pegCalc < 1 ? '(undervalued)' : pegCalc < 2 ? '(fair)' : '(expensive)'}`);
+  }
+
+  // ── 3. EV/EBITDA vs sector benchmarks ────────────────────────────────────
+  if (!isNaN(evEb) && evEb > 0) {
+    // Rough sector-neutral threshold: <12 cheap, 12-20 fair, >20 expensive
+    const sc = evEb < 8 ? 2 : evEb < 13 ? 1 : evEb < 20 ? 0 : evEb < 30 ? -1 : -2;
+    addSignal("evebitda", "EV/EBITDA", evEb, sc, `${evEb.toFixed(1)}x ${evEb < 13 ? '(cheap)' : evEb < 20 ? '(fair)' : '(expensive)'}`);
+  }
+
+  // ── 4. Analyst target gap ─────────────────────────────────────────────────
+  if (!isNaN(target) && !isNaN(price) && price > 0) {
+    const analystUp = (target - price) / price * 100;
+    const sc = analystUp > 30 ? 2 : analystUp > 10 ? 1 : analystUp > -5 ? 0 : analystUp > -20 ? -1 : -2;
+    addSignal("analyst", "Analyst Target", analystUp, sc, `$${target.toFixed(2)} (${analystUp >= 0 ? '+' : ''}${analystUp.toFixed(1)}% upside)`);
+  }
+
+  // ── 5. 52-week position (distance from low = buffer) ─────────────────────
+  if (!isNaN(hi52) && !isNaN(lo52) && lo52 > 0) {
+    const rangePct = (price - lo52) / (hi52 - lo52) * 100; // 0% = at low, 100% = at high
+    const sc = rangePct < 20 ? 2 : rangePct < 40 ? 1 : rangePct < 65 ? 0 : rangePct < 85 ? -1 : -2;
+    addSignal("52w", "52w Position", rangePct, sc, `${rangePct.toFixed(0)}% of range — ${rangePct < 30 ? 'near low' : rangePct > 75 ? 'near high' : 'mid-range'}`);
+  }
+
+  // ── 6. Analyst consensus ──────────────────────────────────────────────────
+  const consMap = {
+    "strong_buy": 2, "buy": 1, "outperform": 1,
+    "hold": 0, "neutral": 0,
+    "underperform": -1, "sell": -1, "strong_sell": -2
+  };
+  if (konsens && konsens !== "n/a") {
+    const sc = consMap[konsens] !== undefined ? consMap[konsens] : 0;
+    addSignal("consensus", "Wall St. Consensus", sc, sc, konsens.replace(/_/g, " ").toUpperCase());
+  }
+
+  // ── 7. DCF upside (injected async from lastDCF) ───────────────────────────
+  if (dcfUpside !== null && !isNaN(dcfUpside)) {
+    const sc = dcfUpside > 30 ? 2 : dcfUpside > 10 ? 1 : dcfUpside > -10 ? 0 : dcfUpside > -30 ? -1 : -2;
+    addSignal("dcf", "DCF Base Case", dcfUpside, sc, `${dcfUpside >= 0 ? '+' : ''}${dcfUpside.toFixed(1)}% vs current price`);
+  }
+
+  // ── Aggregate score & verdict ─────────────────────────────────────────────
+  const maxPossible = scoredCount * 2;
+  const minPossible = scoredCount * -2;
+  const normalised  = maxPossible > 0
+    ? ((totalScore - minPossible) / (maxPossible - minPossible) * 100)
+    : 50;
+
+  let verdict, badgeClass, barColor;
+  if (normalised >= 75)      { verdict = "STRONG BUY";   badgeClass = "strong-buy";  barColor = "#4A9ED6"; }
+  else if (normalised >= 58) { verdict = "UNDERVALUED";  badgeClass = "undervalued"; barColor = "#64B5F6"; }
+  else if (normalised >= 42) { verdict = "FAIR VALUE";   badgeClass = "fair";        barColor = "#F0B429"; }
+  else if (normalised >= 25) { verdict = "OVERVALUED";   badgeClass = "overvalued";  barColor = "#E05470"; }
+  else                       { verdict = "STRONG SELL";  badgeClass = "strong-sell"; barColor = "#c0392b"; }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function dotClass(sc) {
+    return sc >= 1 ? "dot-bull" : sc <= -1 ? "dot-bear" : "dot-neu";
+  }
+  function valColor(sc) {
+    return sc >= 1 ? "var(--green)" : sc <= -1 ? "var(--red)" : "var(--yellow)";
+  }
+
+  const signalCards = signals.map(sig => `
+    <div class="mos-signal-row">
+      <div>
+        <div class="mos-signal-key">${sig.label}</div>
+        <div class="mos-signal-val" style="color:${valColor(sig.score)}">${sig.display}</div>
+      </div>
+      <div class="mos-signal-dot ${dotClass(sig.score)}"></div>
+    </div>`).join("");
+
+  const dcfPending = dcfUpside === null
+    ? `<span class="mos-dcf-pending">DCF loading…</span>` : "";
+
+  el.innerHTML = `
+    <div class="mos-widget">
+      <div class="mos-header-row">
+        <div>
+          <div style="font-size:9px;color:var(--text2);letter-spacing:2px;margin-bottom:5px">
+            MARGIN OF SAFETY — ${signals.length} SIGNAL${signals.length !== 1 ? 'S' : ''}
+            ${dcfPending}
+          </div>
+          <span class="mos-badge ${badgeClass}">${verdict}</span>
+        </div>
+        <div style="flex:1;min-width:120px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span class="mos-score-label">OVERVALUED</span>
+            <span class="mos-score-label">UNDERVALUED</span>
+          </div>
+          <div class="mos-score-bar-wrap">
+            <div class="mos-score-bar"
+              style="width:${normalised.toFixed(1)}%;background:${barColor}"></div>
+          </div>
+          <div style="font-size:9px;color:var(--text2);margin-top:3px;text-align:right">
+            Score: ${totalScore >= 0 ? '+' : ''}${totalScore} / ${maxPossible}
+          </div>
+        </div>
+      </div>
+      <div class="mos-signals">${signalCards}</div>
+      <div style="font-size:9px;color:var(--text2);margin-top:8px">
+        ⚠ MoS score is mechanical — based on Graham Number, PEG, EV/EBITDA, analyst targets, 52w position, Wall St. consensus${dcfUpside !== null ? ', and DCF' : ''}. Not financial advice.
+      </div>
+    </div>`;
+}
+
 function visResultat(d) {
   const f = d.fundamental;
   const s = d.signaler;
@@ -1655,7 +1970,13 @@ function visResultat(d) {
           </div>
         </div>
       </div>
+      <!-- Margin of Safety widget (populated by beregnMoS) -->
+      <div id="mosWidget"></div>
     </div>`;
+
+  // Render MoS immediately with available data (DCF injected later)
+  window._mosF = f;
+  beregnMoS(f, null);
 
   // ── Teknisk ──
   const rsiCls = s.rsi < 30 ? "pos" : s.rsi > 70 ? "neg" : "neu";
@@ -1726,6 +2047,12 @@ function visResultat(d) {
           <span class="cell-label">${l}</span>
           <span class="cell-value">${v}</span>
         </div>`).join("")}
+    </div>
+    <div id="fund-mos-section" style="margin-top:12px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border)">
+      <div style="font-size:9px;letter-spacing:2px;color:var(--green2);margin-bottom:8px">▸ MARGIN OF SAFETY INDICATORS</div>
+      <div id="fund-mos-body" style="color:var(--text2);font-size:10px">
+        <span class="loader-dots">Loading valuation indicators</span>
+      </div>
     </div>`;
 
   // ── Risiko ──
