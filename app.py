@@ -401,6 +401,185 @@ def api_chart():
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
 
+@app.route("/api/dcf", methods=["POST"])
+def api_dcf():
+    """
+    Professional DCF valuation:
+      • WACC built from CAPM (cost of equity) + after-tax cost of debt
+      • 2-stage DCF: 5-year explicit FCF projection + Gordon Growth terminal value
+      • Bull / Base / Bear scenarios
+      • Sensitivity matrix: intrinsic value across growth × WACC grid
+    """
+    data   = request.json
+    ticker = data.get("ticker","").strip().upper()
+    if not ticker:
+        return safe_jsonify({"error": "No ticker"}), 400
+
+    cache_key = f"dcf:{ticker}"
+    cached = cache_get(cache_key)
+    if cached:
+        return safe_jsonify(cached)
+
+    try:
+        aksje = yf.Ticker(ticker)
+        info  = aksje.info
+
+        # ── Raw inputs ──────────────────────────────────────────────────────
+        cur_price     = info.get("currentPrice") or info.get("regularMarketPrice")
+        shares_out    = info.get("sharesOutstanding")
+        market_cap    = info.get("marketCap")
+        total_debt    = info.get("totalDebt", 0) or 0
+        cash          = info.get("totalCash", 0) or 0
+        fcf           = info.get("freeCashflow")
+        revenue       = info.get("totalRevenue")
+        ebitda_val    = info.get("ebitda")
+        op_margin     = info.get("operatingMargins")
+        beta          = info.get("beta", 1.0) or 1.0
+        tax_rate      = info.get("effectiveTaxRate", 0.21) or 0.21
+        interest_exp  = abs(info.get("interestExpense", 0) or 0)
+        sector        = info.get("sector", "")
+        currency      = info.get("currency", "USD")
+
+        # Validate we have the minimum needed
+        if not fcf or not shares_out or not cur_price:
+            return safe_jsonify({"error": "Insufficient financial data for DCF (need FCF, shares outstanding, current price)."}), 422
+
+        # ── WACC ────────────────────────────────────────────────────────────
+        RF          = RISIKOFRI_RENTE           # 4.5 % — matches global constant
+        ERP         = 0.055                     # equity risk premium 5.5 %
+        cost_equity = RF + float(beta) * ERP    # CAPM
+
+        enterprise_value = market_cap + total_debt - cash if market_cap else None
+        debt_weight   = total_debt / (total_debt + market_cap) if market_cap and total_debt else 0.0
+        equity_weight = 1.0 - debt_weight
+        cost_debt_pre = (interest_exp / total_debt) if total_debt and interest_exp else 0.04
+        cost_debt_pre = max(0.02, min(cost_debt_pre, 0.15))   # cap at reasonable range
+        cost_debt     = cost_debt_pre * (1 - float(tax_rate))
+        wacc          = equity_weight * cost_equity + debt_weight * cost_debt
+
+        # ── Scenario growth assumptions ─────────────────────────────────────
+        # Sector-aware base growth heuristics
+        SECTOR_GROWTH = {
+            "Technology": 0.12, "Healthcare": 0.09, "Communication Services": 0.10,
+            "Consumer Discretionary": 0.08, "Financials": 0.07, "Industrials": 0.07,
+            "Consumer Staples": 0.05, "Energy": 0.05, "Materials": 0.05,
+            "Real Estate": 0.05, "Utilities": 0.04,
+        }
+        base_g = SECTOR_GROWTH.get(sector, 0.07)
+
+        scenarios = {
+            "Bear": {"g5": base_g - 0.05, "terminal": 0.020, "wacc_adj": +0.015, "label": "BEAR"},
+            "Base": {"g5": base_g,        "terminal": 0.030, "wacc_adj":  0.000, "label": "BASE"},
+            "Bull": {"g5": base_g + 0.05, "terminal": 0.040, "wacc_adj": -0.010, "label": "BULL"},
+        }
+
+        def run_dcf(fcf_base, g5, terminal_g, w):
+            """Returns intrinsic equity value per share."""
+            w = max(w, 0.03)  # floor WACC at 3 %
+            g5 = max(g5, -0.20)
+            terminal_g = min(terminal_g, w - 0.005)  # terminal g must be < WACC
+
+            # Stage 1: explicit 5-year FCFs
+            pv_fcfs = 0.0
+            cf = float(fcf_base)
+            for yr in range(1, 6):
+                cf *= (1 + g5)
+                pv_fcfs += cf / (1 + w) ** yr
+
+            # Stage 2: terminal value (Gordon Growth) at end of year 5
+            terminal_fcf = cf * (1 + terminal_g)
+            terminal_val = terminal_fcf / (w - terminal_g)
+            pv_terminal  = terminal_val / (1 + w) ** 5
+
+            # Equity value = enterprise DCF − net debt → per share
+            enterprise_dcf = pv_fcfs + pv_terminal
+            equity_val     = enterprise_dcf + float(cash) - float(total_debt)
+            equity_val     = max(equity_val, 0)
+            return round(equity_val / float(shares_out), 2), round(pv_fcfs, 0), round(pv_terminal, 0)
+
+        scenario_results = {}
+        for name, sc in scenarios.items():
+            w_adj    = wacc + sc["wacc_adj"]
+            iv, pv1, pv2 = run_dcf(fcf, sc["g5"], sc["terminal"], w_adj)
+            upside   = round((iv - float(cur_price)) / float(cur_price) * 100, 1) if cur_price else None
+            scenario_results[name] = {
+                "label":       sc["label"],
+                "g5":          round(sc["g5"] * 100, 1),
+                "terminal_g":  round(sc["terminal"] * 100, 1),
+                "wacc":        round(w_adj * 100, 2),
+                "intrinsic":   iv,
+                "upside":      upside,
+                "pv_fcfs":     pv1,
+                "pv_terminal": pv2,
+            }
+
+        # ── Sensitivity matrix ──────────────────────────────────────────────
+        # Rows = growth rate (stage 1), Cols = WACC
+        g_range    = [base_g + d for d in (-0.08, -0.05, -0.02, 0, +0.03, +0.06, +0.09)]
+        wacc_range = [wacc + d   for d in (-0.03, -0.02, -0.01, 0, +0.01, +0.02, +0.03)]
+        base_terminal = scenarios["Base"]["terminal"]
+
+        matrix = []
+        for g in g_range:
+            row = []
+            for w in wacc_range:
+                iv, _, _ = run_dcf(fcf, g, base_terminal, w)
+                row.append(iv)
+            matrix.append(row)
+
+        # ── Explicit 5-year FCF table (Base scenario) ───────────────────────
+        base_w = wacc + scenarios["Base"]["wacc_adj"]
+        base_g5 = scenarios["Base"]["g5"]
+        fcf_table = []
+        cf = float(fcf)
+        for yr in range(1, 6):
+            cf *= (1 + base_g5)
+            pv = cf / (1 + base_w) ** yr
+            fcf_table.append({
+                "year":    yr,
+                "fcf":     round(cf / 1e9, 3),
+                "pv":      round(pv / 1e9, 3),
+            })
+
+        result = {
+            "ticker":        ticker,
+            "currency":      currency,
+            "currentPrice":  round(float(cur_price), 2),
+            "fcfBase":       round(float(fcf) / 1e9, 3),   # in billions
+            "sharesOut":     round(float(shares_out) / 1e9, 3),
+            "netDebt":       round((total_debt - cash) / 1e9, 2),
+            "wacc": {
+                "total":        round(wacc * 100, 2),
+                "costEquity":   round(cost_equity * 100, 2),
+                "costDebt":     round(cost_debt * 100, 2),
+                "costDebtPre":  round(cost_debt_pre * 100, 2),
+                "equityWeight": round(equity_weight * 100, 1),
+                "debtWeight":   round(debt_weight * 100, 1),
+                "beta":         round(float(beta), 2),
+                "rf":           round(RF * 100, 2),
+                "erp":          round(ERP * 100, 2),
+                "taxRate":      round(float(tax_rate) * 100, 1),
+            },
+            "scenarios":     scenario_results,
+            "sensitivity": {
+                "matrix":     matrix,
+                "g_labels":   [f"{round(g*100,1)}%" for g in g_range],
+                "wacc_labels":[f"{round(w*100,2)}%" for w in wacc_range],
+                "base_g_idx": 3,   # index of base row (g=0 offset)
+                "base_w_idx": 3,   # index of base col (wacc=0 offset)
+            },
+            "fcfTable":      fcf_table,
+            "baseGrowth":    round(base_g * 100, 1),
+            "sector":        sector,
+        }
+        cache_set(cache_key, result)
+        return safe_jsonify(result)
+
+    except Exception as e:
+        logger.error(f"[api_dcf] {ticker}: {e}")
+        return safe_jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/ai_analyse", methods=["POST"])
 def api_ai_analyse():
     data       = request.json
