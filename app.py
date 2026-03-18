@@ -363,6 +363,18 @@ def api_analyse():
         "52u_lav":    safe(info.get("fiftyTwoWeekLow")),
         "mål":        safe(info.get("targetMeanPrice")),
         "konsensus":  info.get("recommendationKey","N/A").upper(),
+        # Raw numeric fields for Margin of Safety calculations (None if unavailable)
+        "_pris_raw":          info.get("currentPrice") or info.get("regularMarketPrice"),
+        "_pe_raw":            info.get("trailingPE"),
+        "_eps_raw":           info.get("trailingEps"),
+        "_pb_raw":            info.get("priceToBook"),
+        "_earnings_growth":   info.get("earningsGrowth"),   # trailing YoY EPS growth
+        "_revenue_growth":    info.get("revenueGrowth"),
+        "_52u_høy_raw":       info.get("fiftyTwoWeekHigh"),
+        "_52u_lav_raw":       info.get("fiftyTwoWeekLow"),
+        "_mål_raw":           info.get("targetMeanPrice"),
+        "_evEbitda_raw":      info.get("enterpriseToEbitda"),
+        "_peg_raw":           info.get("pegRatio"),
     }
 
     result = {
@@ -541,6 +553,158 @@ def api_dcf():
                 "pv":      round(pv / 1e9, 3),
             })
 
+        # ── Margin of Safety indicators ──────────────────────────────────────
+        mos_signals = []
+
+        # 1. DCF Margin of Safety (Base case)
+        dcf_base_iv   = scenario_results["Base"]["intrinsic"]
+        dcf_base_up   = scenario_results["Base"]["upside"]
+        if dcf_base_iv and dcf_base_up is not None:
+            if dcf_base_up >= 30:
+                dcf_verdict = ("STRONG BUY", "green", f"DCF intrinsic {dcf_base_up:+.1f}% above current price — significant margin of safety")
+            elif dcf_base_up >= 10:
+                dcf_verdict = ("UNDERVALUED", "green", f"DCF intrinsic {dcf_base_up:+.1f}% above current price — moderate margin of safety")
+            elif dcf_base_up >= -10:
+                dcf_verdict = ("FAIRLY VALUED", "yellow", f"DCF intrinsic within ±10% of current price — limited margin of safety")
+            elif dcf_base_up >= -25:
+                dcf_verdict = ("OVERVALUED", "red", f"DCF intrinsic {dcf_base_up:.1f}% below current price — no margin of safety")
+            else:
+                dcf_verdict = ("SIGNIFICANTLY OVERVALUED", "red", f"DCF intrinsic {dcf_base_up:.1f}% below current price — avoid")
+            mos_signals.append({
+                "method":  "DCF (Base Case)",
+                "iv":      round(dcf_base_iv, 2),
+                "upside":  dcf_base_up,
+                "verdict": dcf_verdict[0],
+                "color":   dcf_verdict[1],
+                "note":    dcf_verdict[2],
+            })
+
+        # 2. Graham Number: √(22.5 × EPS × BVPS)
+        eps     = info.get("trailingEps")
+        bvps    = info.get("bookValue")
+        graham  = None
+        if eps and bvps and float(eps) > 0 and float(bvps) > 0:
+            graham = round((22.5 * float(eps) * float(bvps)) ** 0.5, 2)
+            g_up   = round((graham - float(cur_price)) / float(cur_price) * 100, 1)
+            if g_up >= 20:
+                gv = ("UNDERVALUED", "green", f"Graham Number {graham:.2f} — {g_up:+.1f}% above price")
+            elif g_up >= -5:
+                gv = ("FAIRLY VALUED", "yellow", f"Graham Number {graham:.2f} — {g_up:+.1f}% vs price")
+            else:
+                gv = ("OVERVALUED", "red", f"Graham Number {graham:.2f} — {g_up:.1f}% below price")
+            mos_signals.append({
+                "method":  "Graham Number",
+                "iv":      graham,
+                "upside":  g_up,
+                "verdict": gv[0],
+                "color":   gv[1],
+                "note":    gv[2],
+            })
+
+        # 3. PEG Ratio (P/E ÷ earnings growth)
+        pe_ratio      = info.get("trailingPE")
+        earnings_grow = info.get("earningsGrowth") or info.get("revenueGrowth")
+        peg           = None
+        if pe_ratio and earnings_grow and float(earnings_grow) > 0:
+            peg = round(float(pe_ratio) / (float(earnings_grow) * 100), 2)
+            if peg < 0.5:
+                pgv = ("VERY CHEAP", "green", f"PEG {peg} — deeply undervalued relative to growth")
+            elif peg < 1.0:
+                pgv = ("UNDERVALUED", "green", f"PEG {peg} — trading below growth rate (classic value signal)")
+            elif peg < 1.5:
+                pgv = ("FAIRLY VALUED", "yellow", f"PEG {peg} — fairly priced for its growth rate")
+            elif peg < 2.5:
+                pgv = ("OVERVALUED", "red", f"PEG {peg} — paying a premium over growth rate")
+            else:
+                pgv = ("EXPENSIVE", "red", f"PEG {peg} — significantly expensive vs. growth")
+            mos_signals.append({
+                "method":  "PEG Ratio",
+                "iv":      None,
+                "upside":  None,
+                "peg":     peg,
+                "verdict": pgv[0],
+                "color":   pgv[1],
+                "note":    pgv[2],
+            })
+
+        # 4. EV/EBITDA vs. sector median benchmarks
+        SECTOR_EV_EBITDA = {
+            "Technology": 25, "Healthcare": 18, "Communication Services": 15,
+            "Consumer Discretionary": 14, "Financials": 12, "Industrials": 13,
+            "Consumer Staples": 14, "Energy": 8, "Materials": 10,
+            "Real Estate": 20, "Utilities": 12,
+        }
+        ev_ebitda = None
+        if enterprise_value and ebitda_val and float(ebitda_val) > 0:
+            ev_ebitda     = round(float(enterprise_value) / float(ebitda_val), 1)
+            sector_median = SECTOR_EV_EBITDA.get(sector, 14)
+            premium       = round((ev_ebitda - sector_median) / sector_median * 100, 1)
+            if premium <= -20:
+                evv = ("UNDERVALUED", "green", f"EV/EBITDA {ev_ebitda}x vs. sector median {sector_median}x — {abs(premium):.0f}% discount")
+            elif premium <= 5:
+                evv = ("IN LINE", "yellow", f"EV/EBITDA {ev_ebitda}x vs. sector median {sector_median}x — roughly in line")
+            elif premium <= 30:
+                evv = ("PREMIUM", "yellow", f"EV/EBITDA {ev_ebitda}x vs. sector median {sector_median}x — {premium:.0f}% premium")
+            else:
+                evv = ("EXPENSIVE", "red", f"EV/EBITDA {ev_ebitda}x vs. sector median {sector_median}x — {premium:.0f}% premium")
+            mos_signals.append({
+                "method":   "EV/EBITDA",
+                "iv":       None,
+                "upside":   None,
+                "multiple": ev_ebitda,
+                "sector_median": sector_median,
+                "premium":  premium,
+                "verdict":  evv[0],
+                "color":    evv[1],
+                "note":     evv[2],
+            })
+
+        # 5. Analyst consensus gap (current vs. mean target)
+        target_mean   = info.get("targetMeanPrice")
+        analyst_up    = None
+        if target_mean and cur_price:
+            analyst_up = round((float(target_mean) - float(cur_price)) / float(cur_price) * 100, 1)
+            n_analysts  = info.get("numberOfAnalystOpinions", 0) or 0
+            if analyst_up >= 20:
+                av = ("STRONG BUY", "green", f"Wall Street target {analyst_up:+.1f}% above price ({n_analysts} analysts)")
+            elif analyst_up >= 5:
+                av = ("BUY", "green", f"Wall Street target {analyst_up:+.1f}% above price ({n_analysts} analysts)")
+            elif analyst_up >= -5:
+                av = ("HOLD", "yellow", f"Wall Street target in line with price ({n_analysts} analysts)")
+            else:
+                av = ("SELL", "red", f"Wall Street target {analyst_up:.1f}% below price ({n_analysts} analysts)")
+            mos_signals.append({
+                "method":  "Analyst Consensus",
+                "iv":      round(float(target_mean), 2),
+                "upside":  analyst_up,
+                "verdict": av[0],
+                "color":   av[1],
+                "note":    av[2],
+            })
+
+        # Overall MoS score: weighted average of signal colors
+        COLOR_SCORE = {"green": 2, "yellow": 1, "red": 0}
+        if mos_signals:
+            avg = sum(COLOR_SCORE.get(s["color"], 1) for s in mos_signals) / len(mos_signals)
+            if avg >= 1.7:
+                mos_overall = {"verdict": "STRONG VALUE", "color": "green",
+                               "desc": "Multiple valuation methods agree the stock is undervalued with a meaningful margin of safety."}
+            elif avg >= 1.2:
+                mos_overall = {"verdict": "MODERATE VALUE", "color": "green",
+                               "desc": "More signals point to undervaluation than overvaluation — some margin of safety present."}
+            elif avg >= 0.8:
+                mos_overall = {"verdict": "FAIRLY VALUED", "color": "yellow",
+                               "desc": "Valuation signals are mixed — limited margin of safety at current price."}
+            elif avg >= 0.4:
+                mos_overall = {"verdict": "OVERVALUED", "color": "red",
+                               "desc": "Most signals indicate the stock trades above intrinsic value — margin of safety is negative."}
+            else:
+                mos_overall = {"verdict": "SIGNIFICANTLY OVERVALUED", "color": "red",
+                               "desc": "All valuation methods suggest the stock is materially overpriced."}
+        else:
+            mos_overall = {"verdict": "INSUFFICIENT DATA", "color": "yellow",
+                           "desc": "Not enough data to calculate a meaningful margin of safety score."}
+
         result = {
             "ticker":        ticker,
             "currency":      currency,
@@ -565,12 +729,18 @@ def api_dcf():
                 "matrix":     matrix,
                 "g_labels":   [f"{round(g*100,1)}%" for g in g_range],
                 "wacc_labels":[f"{round(w*100,2)}%" for w in wacc_range],
-                "base_g_idx": 3,   # index of base row (g=0 offset)
-                "base_w_idx": 3,   # index of base col (wacc=0 offset)
+                "base_g_idx": 3,
+                "base_w_idx": 3,
             },
             "fcfTable":      fcf_table,
             "baseGrowth":    round(base_g * 100, 1),
             "sector":        sector,
+            "mos":           mos_signals,
+            "mosOverall":    mos_overall,
+            "graham":        graham,
+            "peg":           peg,
+            "evEbitda":      ev_ebitda,
+            "analystUpside": analyst_up,
         }
         cache_set(cache_key, result)
         return safe_jsonify(result)
