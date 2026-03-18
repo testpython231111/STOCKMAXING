@@ -97,6 +97,20 @@ def safe_float(v):
     except:
         return None
 
+def safe_int(v):
+    try:
+        if v is None:
+            return None
+        out = int(v)
+        return out
+    except Exception:
+        return None
+
+def record_warning(warnings_list, label, exc):
+    logger.warning(f"[{label}] {exc}")
+    if warnings_list is not None and label not in warnings_list:
+        warnings_list.append(label)
+
 def clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
@@ -730,9 +744,6 @@ def api_analyse():
         "_52w_high_raw":      year_high,
         "_52w_low_raw":       year_low,
         "_target_mean_raw":   target_mean,
-        "_52u_høy_raw":       year_high,
-        "_52u_lav_raw":       year_low,
-        "_mål_raw":           target_mean,
         "_evEbitda_raw":      safe_float(info.get("enterpriseToEbitda")),
         "_peg_raw":           info.get("pegRatio"),
     }
@@ -794,6 +805,7 @@ def api_dcf():
 
     try:
         aksje = yf.Ticker(ticker)
+        warnings_list = []
         info  = aksje.info
         try:
             fast_info = aksje.fast_info
@@ -1272,9 +1284,6 @@ def api_ai_analyse():
                 "_52w_high_raw":    year_high,
                 "_52w_low_raw":     year_low,
                 "_target_mean_raw": target_mean,
-                "_52u_hÃ¸y_raw":     year_high,
-                "_52u_lav_raw":     year_low,
-                "_mÃ¥l_raw":         target_mean,
                 "_fcf_source":      snapshot["fcf_source"],
                 "_debt_to_equity_raw": snapshot["debt_to_equity"],
             }
@@ -1284,24 +1293,18 @@ def api_ai_analyse():
         fundamental.setdefault("_52w_high_raw", snapshot["year_high"])
         fundamental.setdefault("_52w_low_raw", snapshot["year_low"])
         fundamental.setdefault("_target_mean_raw", snapshot["target_mean"])
-        fundamental.setdefault("_52u_hÃ¸y_raw", snapshot["year_high"])
-        fundamental.setdefault("_52u_lav_raw", snapshot["year_low"])
-        fundamental.setdefault("_mÃ¥l_raw", snapshot["target_mean"])
         fundamental.setdefault("_fcf_source", snapshot["fcf_source"])
         fundamental.setdefault("_debt_to_equity_raw", snapshot["debt_to_equity"])
         price_now = first_valid_number(info.get("currentPrice"), info.get("regularMarketPrice"), fundamental.get("_pris_raw"))
-        year_high = first_valid_number(info.get("fiftyTwoWeekHigh"), fundamental.get("_52u_høy_raw"))
-        year_low = first_valid_number(info.get("fiftyTwoWeekLow"), fundamental.get("_52u_lav_raw"))
-        year_high = first_valid_number(year_high, fundamental.get("_52w_high_raw"))
-        year_low = first_valid_number(year_low, fundamental.get("_52w_low_raw"))
+        year_high = first_valid_number(info.get("fiftyTwoWeekHigh"), fundamental.get("_52w_high_raw"))
+        year_low = first_valid_number(info.get("fiftyTwoWeekLow"), fundamental.get("_52w_low_raw"))
         range_position = None
         if price_now is not None and year_high is not None and year_low is not None and year_high > year_low:
             range_position = round((price_now - year_low) / (year_high - year_low) * 100, 1)
 
         analyst_ctx = ""
         try:
-            target_mean = first_valid_number(info.get("targetMeanPrice"), fundamental.get("_mål_raw"))
-            target_mean = first_valid_number(target_mean, fundamental.get("_target_mean_raw"))
+            target_mean = first_valid_number(info.get("targetMeanPrice"), fundamental.get("_target_mean_raw"))
             target_mean = first_valid_number(target_mean, snapshot.get("target_mean"))
             target_high = first_valid_number(info.get("targetHighPrice"), snapshot.get("target_high"))
             target_low  = first_valid_number(info.get("targetLowPrice"), snapshot.get("target_low"))
@@ -1511,6 +1514,7 @@ def api_short_interest():
     try:
         aksje = yf.Ticker(ticker)
         info  = aksje.info
+        warnings_list = []
 
         short_pct         = info.get("shortPercentOfFloat")
         short_ratio       = info.get("shortRatio")
@@ -1561,6 +1565,7 @@ def api_options_flow():
         info      = aksje.info
         exps      = aksje.options
         cur_price = info.get("currentPrice") or info.get("regularMarketPrice")
+        warnings_list = []
 
         if not exps:
             return safe_jsonify({"error": "No options data available for this ticker"}), 404
@@ -1589,7 +1594,8 @@ def api_options_flow():
                     "putOI":    int(pi),
                     "pcVol":    round(pv / max(cv, 1), 2),
                 })
-            except: pass
+            except Exception as e:
+                record_warning(warnings_list, f"Options data incomplete for expiry {exp}", e)
 
         pc_vol = round(total_put_vol / max(total_call_vol, 1), 2)
         pc_oi  = round(total_put_oi  / max(total_call_oi,  1), 2)
@@ -1609,7 +1615,8 @@ def api_options_flow():
             if cur_price and not calls.empty:
                 atm  = calls.iloc[(calls['strike'] - cur_price).abs().argsort()[:1]]
                 atm_iv = round(float(atm['impliedVolatility'].values[0]) * 100, 1)
-        except: pass
+        except Exception as e:
+            record_warning(warnings_list, "ATM implied volatility unavailable", e)
 
         # Top 5 calls and puts by open interest (all strikes, nearest expiry)
         top_calls, top_puts = [], []
@@ -1629,7 +1636,8 @@ def api_options_flow():
                     "vol":    int(r['volume']) if r['volume'] == r['volume'] else 0,
                     "iv":     round(float(r['impliedVolatility'])*100, 1) if r['impliedVolatility'] == r['impliedVolatility'] else None,
                 })
-        except: pass
+        except Exception as e:
+            record_warning(warnings_list, "Top open interest strikes unavailable", e)
 
         return safe_jsonify({
             "currentPrice":    round(float(cur_price), 2) if cur_price else None,
@@ -1646,6 +1654,7 @@ def api_options_flow():
             "topCalls":        top_calls,
             "topPuts":         top_puts,
             "nearestExp":      exps[0],
+            "warnings":        warnings_list,
         })
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
@@ -1802,7 +1811,8 @@ def api_earnings():
                         next_date = str(cal["Earnings Date"].iloc[0])[:10]
                     elif "Earnings Date" in cal.index:
                         next_date = str(cal.loc["Earnings Date"].iloc[0])[:10]
-        except: pass
+        except Exception as e:
+            record_warning(warnings_list, "Next earnings date unavailable", e)
 
         # Earnings history
         history = []
@@ -1816,13 +1826,15 @@ def api_earnings():
                     try:
                         actual   = None if (actual   is not None and (actual   != actual))   else actual
                         estimate = None if (estimate is not None and (estimate != estimate)) else estimate
-                    except: pass
+                    except Exception as e:
+                        record_warning(warnings_list, f"Earnings row cleanup failed for {str(idx)[:10]}", e)
                     history.append({
                         "date":     str(idx)[:10],
                         "actual":   actual,
                         "estimate": estimate,
                     })
-        except:
+        except Exception as primary_error:
+            record_warning(warnings_list, "Primary earnings history source unavailable", primary_error)
             try:
                 ei = aksje.earnings_dates
                 if ei is not None and not ei.empty:
@@ -1831,11 +1843,13 @@ def api_earnings():
                         actual   = float(row["Reported EPS"])  if "Reported EPS"  in row and row["Reported EPS"]  == row["Reported EPS"]  else None
                         estimate = float(row["EPS Estimate"])  if "EPS Estimate"  in row and row["EPS Estimate"]  == row["EPS Estimate"]  else None
                         history.append({"date": str(idx)[:10], "actual": actual, "estimate": estimate})
-            except: pass
+            except Exception as fallback_error:
+                record_warning(warnings_list, "Fallback earnings history source unavailable", fallback_error)
 
         return safe_jsonify({
             "next_earnings": {"date": next_date, "time": next_time, "estimate": next_est} if next_date else None,
-            "history": history
+            "history": history,
+            "warnings": warnings_list,
         })
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
@@ -1932,7 +1946,8 @@ def api_analyst():
                     })
                     if len(upgrades) >= 20:
                         break
-        except: pass
+        except Exception as e:
+            record_warning(warnings_list, "Analyst recommendations history unavailable", e)
 
         strong_buy_n = int(info.get("numberOfStrongBuyOpinions") or info.get("strongBuy") or 0)
         buy_n        = int(info.get("numberOfBuyOpinions")       or info.get("buy")       or 0)
@@ -1951,7 +1966,8 @@ def api_analyst():
                     hold_n       = int(latest.get("hold",       0) or 0)
                     sell_n       = int(latest.get("sell",       0) or 0)
                     strong_sell_n= int(latest.get("strongSell", 0) or 0)
-            except: pass
+            except Exception as e:
+                record_warning(warnings_list, "Analyst recommendation summary unavailable", e)
 
         return safe_jsonify({
             "currentPrice": round(current_price,2) if current_price else None,
@@ -1966,6 +1982,7 @@ def api_analyst():
             "sell":         sell_n,
             "strongSell":   strong_sell_n,
             "upgrades":     upgrades,
+            "warnings":     warnings_list,
         })
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
@@ -1978,6 +1995,7 @@ def api_insider():
     try:
         aksje = yf.Ticker(ticker)
         transactions = []
+        warnings_list = []
         try:
             ins = aksje.insider_transactions
             if ins is not None and not ins.empty:
@@ -1985,10 +2003,8 @@ def api_insider():
                 for _, row in ins.iterrows():
                     shares = row.get("Shares") or row.get("shares")
                     value  = row.get("Value") or row.get("value")
-                    try: shares = int(shares) if shares == shares else None
-                    except: shares = None
-                    try: value = int(value) if value == value else None
-                    except: value = None
+                    shares = safe_int(shares) if shares == shares else None
+                    value = safe_int(value) if value == value else None
                     transactions.append({
                         "date":   str(row.get("Start Date", row.get("Date","")))[:10],
                         "name":   str(row.get("Insider",""))[:40],
@@ -1997,7 +2013,8 @@ def api_insider():
                         "shares": shares,
                         "value":  value,
                     })
-        except: pass
+        except Exception as e:
+            record_warning(warnings_list, "Detailed insider transactions unavailable", e)
 
         if not transactions:
             try:
@@ -2009,12 +2026,13 @@ def api_insider():
                             "name":   str(row.get("Insider",""))[:40],
                             "title":  str(row.get("Position",""))[:30],
                             "type":   "Purchase",
-                            "shares": int(row["Shares"]) if "Shares" in row else None,
-                            "value":  int(row["Value"])  if "Value"  in row else None,
+                            "shares": safe_int(row["Shares"]) if "Shares" in row else None,
+                            "value":  safe_int(row["Value"])  if "Value"  in row else None,
                         })
-            except: pass
+            except Exception as e:
+                record_warning(warnings_list, "Fallback insider purchase summary unavailable", e)
 
-        return safe_jsonify({"transactions": transactions})
+        return safe_jsonify({"transactions": transactions, "warnings": warnings_list})
     except Exception as e:
         return safe_jsonify({"error": str(e)}), 500
 
@@ -2026,6 +2044,7 @@ def api_sammenlign():
     periode  = data.get("periode", "1y")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
     resultat = []
+    warnings_list = []
 
     # Download benchmark once outside the loop
     bm_ret = None
@@ -2034,7 +2053,8 @@ def api_sammenlign():
         if not bm.empty:
             if isinstance(bm.columns, pd.MultiIndex): bm.columns = bm.columns.get_level_values(0)
             bm_ret = bm["Close"].pct_change().dropna()
-    except: pass
+    except Exception as e:
+        record_warning(warnings_list, "Benchmark download unavailable", e)
 
     for t in tickers:
         try:
@@ -2095,7 +2115,8 @@ def api_sammenlign():
                 "beta":         beta,
                 "historikk":    historikk,
             })
-        except: pass
+        except Exception as e:
+            record_warning(warnings_list, f"Comparison data unavailable for {t}", e)
 
     # AI comparison
     ai_tekst = ""
@@ -2130,7 +2151,7 @@ FINAL INSTRUCTION:
 """
         ai_tekst = spør_ai(prompt, gemini_key, 1200)
 
-    return safe_jsonify({"aksjer": resultat, "ai": ai_tekst})
+    return safe_jsonify({"aksjer": resultat, "ai": ai_tekst, "warnings": warnings_list})
 
 @app.route("/api/portefolje_analyse", methods=["POST"])
 def api_portefolje_analyse():
