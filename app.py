@@ -1792,6 +1792,7 @@ def api_earnings():
     ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
+    warnings_list = []
     try:
         aksje = yf.Ticker(ticker)
 
@@ -1859,6 +1860,7 @@ def api_analyst():
     ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
+    warnings_list = []
     try:
         aksje = yf.Ticker(ticker)
         info  = aksje.info
