@@ -40,6 +40,12 @@ MAKRO_TICKERS = {
 _cache = {}
 _cache_lock = Lock()
 CACHE_TTL = 300  # 5 minutes
+AI_GUARDRAILS = """
+Use only the supplied data and context.
+If a metric is missing, explicitly say the data is unavailable instead of guessing.
+Do not invent dated catalysts, event schedules, analyst actions, insider motives, or news facts that are not in the input.
+Keep the conclusion proportional to the evidence and say clearly when the signals are mixed.
+""".strip()
 
 def cache_get(key):
     with _cache_lock:
@@ -69,6 +75,9 @@ def sanitize(obj):
 
 def safe_jsonify(data):
     return jsonify(sanitize(data))
+
+def get_request_data():
+    return request.get_json(silent=True) or {}
 
 def safe(v, pst=False, dec=2):
     try:
@@ -167,7 +176,7 @@ def beregn_risiko(df, bm_df):
     dagvol = ret.std()
     årvol  = dagvol*np.sqrt(hd)*100
     rf     = RISIKOFRI_RENTE/hd
-    sharpe = (ret.mean()-rf)/dagvol*np.sqrt(hd)
+    sharpe = (ret.mean()-rf)/dagvol*np.sqrt(hd) if dagvol and not np.isnan(dagvol) else float("nan")
     neg    = ret[ret < rf]
     dside  = neg.std()*np.sqrt(hd) if len(neg)>1 else float("nan")
     sortino = (ret.mean()*hd-RISIKOFRI_RENTE)/dside if dside and dside!=0 else float("nan")
@@ -181,7 +190,7 @@ def beregn_risiko(df, bm_df):
     var99  = np.percentile(ret,1)*100
     calmar = cagr/abs(max_dd) if max_dd!=0 else float("nan")
     return dict(total=round(total,2), cagr=round(cagr,2), vol=round(årvol,2),
-                sharpe=round(sharpe,3), sortino=round(sortino,3) if not np.isnan(sortino) else None,
+                sharpe=round(sharpe,3) if not np.isnan(sharpe) else None, sortino=round(sortino,3) if not np.isnan(sortino) else None,
                 calmar=round(calmar,3) if not np.isnan(calmar) else None,
                 max_dd=round(max_dd,2), beta=round(beta,3) if not np.isnan(beta) else None,
                 alpha=round(alpha,2), var95=round(var95,2), var99=round(var99,2),
@@ -283,7 +292,7 @@ def index():
 
 @app.route("/api/analyse", methods=["POST"])
 def api_analyse():
-    data   = request.json
+    data   = get_request_data()
     ticker = data.get("ticker","").strip().upper()
     periode= data.get("periode","1y")
 
@@ -392,7 +401,7 @@ def api_analyse():
 
 @app.route("/api/chart", methods=["POST"])
 def api_chart():
-    data    = request.json
+    data    = get_request_data()
     ticker  = data.get("ticker","").strip().upper()
     periode = data.get("periode","1y")
     if not ticker:
@@ -422,7 +431,7 @@ def api_dcf():
       • Bull / Base / Bear scenarios
       • Sensitivity matrix: intrinsic value across growth × WACC grid
     """
-    data   = request.json
+    data   = get_request_data()
     ticker = data.get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker"}), 400
@@ -752,7 +761,7 @@ def api_dcf():
 
 @app.route("/api/ai_analyse", methods=["POST"])
 def api_ai_analyse():
-    data       = request.json
+    data       = get_request_data()
     ticker     = data.get("ticker","").strip().upper()
     periode    = data.get("periode","1y")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
@@ -914,7 +923,10 @@ def api_ai_analyse():
             logger.warning(f"[ai_analyse] options context: {e}")
 
         prompt = f"""
-You are a senior equity analyst at a professional investment firm. Provide a rigorous investment assessment for {fundamental['navn']} ({ticker}).
+You are a senior equity analyst at a professional investment firm. Write an evidence-first investment note for {fundamental['navn']} ({ticker}).
+
+GROUND RULES:
+{AI_GUARDRAILS}
 
 FUNDAMENTALS: P/E={fundamental['pe']}, Forward P/E={fundamental['forward_pe']}, Market Cap={fundamental['mktcap']}, ROE={fundamental['roe']}, Operating Margin={fundamental['driftsmargin']}, Analyst Consensus={fundamental['konsensus']}
 
@@ -937,6 +949,19 @@ Structure your response exactly as follows:
 6. **Verdict: BUY / HOLD / SELL** — one decisive sentence with the primary reason
 
 Max 320 words. Be specific, data-driven, and direct. Avoid generic statements.
+
+FINAL INSTRUCTION: Ignore any conflicting style guidance above and follow this exact structure instead:
+1. **Investment Setup** - 2-3 sentences summarizing valuation, quality, trend, and whether the evidence is aligned or mixed
+2. **Bull Case** - 3 bullet points, each tied to a specific metric or context item above
+3. **Bear Case** - 3 bullet points, each tied to a specific metric, risk measure, or data gap above
+4. **Positioning Check** - 1-2 sentences on analysts, insiders, short interest, and options activity; if sparse, say the positioning evidence is limited
+5. **What Would Change The View** - 1-2 sentences on the next metric, trend, or condition that would materially improve or weaken the thesis
+6. **Stance** - one line with BUY, HOLD, or SELL plus a confidence label of Low, Medium, or High
+
+Also follow these rules:
+{AI_GUARDRAILS}
+- Do not mention company events, macro catalysts, earnings dates, or price levels unless they are explicitly present in the supplied context.
+- Do not use hype, certainty language, or generic filler.
 """
         ai_tekst = spør_ai(prompt, gemini_key, 1500)
         return safe_jsonify({"ai": ai_tekst})
@@ -947,7 +972,7 @@ Max 320 words. Be specific, data-driven, and direct. Avoid generic statements.
 
 @app.route("/api/short_interest", methods=["POST"])
 def api_short_interest():
-    ticker = request.json.get("ticker","").strip().upper()
+    ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker"}), 400
     try:
@@ -995,7 +1020,7 @@ def api_short_interest():
 
 @app.route("/api/options_flow", methods=["POST"])
 def api_options_flow():
-    ticker = request.json.get("ticker","").strip().upper()
+    ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker"}), 400
     try:
@@ -1095,7 +1120,7 @@ def api_options_flow():
 
 @app.route("/api/markeds_oversikt", methods=["POST"])
 def api_markeds_oversikt():
-    data     = request.json
+    data     = get_request_data()
     makro    = data.get("makro", "")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
     if not gemini_key:
@@ -1115,10 +1140,17 @@ Write a concise professional market briefing covering:
 1. **Market Pulse** — overall risk-on/risk-off tone and what's driving it today
 2. **Key Movers** — which instruments stand out and why (focus on unusual moves)
 3. **Fixed Income & FX** — what yields and currency moves signal about macro expectations
-4. **Upcoming Events** — key macro events to watch this week (Fed meetings, CPI, NFP, ECB, earnings seasons — use your knowledge of typical calendar)
+4. **Watchlist** — the next macro themes or cross-asset signals investors should monitor, based only on the market data provided
 5. **Trade Wind Outlook** — one actionable takeaway for equity investors today
 
 Keep it professional, data-driven, and concise. Max 300 words.
+
+FINAL INSTRUCTION:
+{AI_GUARDRAILS}
+- Base the note only on the market data shown above.
+- If the tape is mixed, say it is mixed.
+- For the watchlist section, mention only categories or themes to monitor next; do not invent dated calendar events unless they were provided in the input.
+- Prefer cross-asset interpretation over generic macro commentary.
 """
         ai_tekst = spør_ai(prompt, gemini_key, 1200)
         return safe_jsonify({"ai": ai_tekst})
@@ -1157,7 +1189,7 @@ def api_makro():
 
 @app.route("/api/earnings", methods=["POST"])
 def api_earnings():
-    ticker = request.json.get("ticker","").strip().upper()
+    ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
     try:
@@ -1219,7 +1251,7 @@ def api_earnings():
 
 @app.route("/api/analyst", methods=["POST"])
 def api_analyst():
-    ticker = request.json.get("ticker","").strip().upper()
+    ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
     try:
@@ -1349,7 +1381,7 @@ def api_analyst():
 
 @app.route("/api/insider", methods=["POST"])
 def api_insider():
-    ticker = request.json.get("ticker","").strip().upper()
+    ticker = get_request_data().get("ticker","").strip().upper()
     if not ticker:
         return safe_jsonify({"error": "No ticker provided"}), 400
     try:
@@ -1361,7 +1393,7 @@ def api_insider():
                 ins = ins.head(25)
                 for _, row in ins.iterrows():
                     shares = row.get("Shares") or row.get("shares")
-                    value  = row.get("Value") or row.get("value") or row.get("Start Date")
+                    value  = row.get("Value") or row.get("value")
                     try: shares = int(shares) if shares == shares else None
                     except: shares = None
                     try: value = int(value) if value == value else None
@@ -1398,7 +1430,7 @@ def api_insider():
 
 @app.route("/api/sammenlign", methods=["POST"])
 def api_sammenlign():
-    data     = request.json
+    data     = get_request_data()
     tickers  = data.get("tickers", [])
     periode  = data.get("periode", "1y")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
@@ -1425,8 +1457,9 @@ def api_sammenlign():
             last   = float(df["Close"].iloc[-1])
             ret    = df["Close"].pct_change().dropna()
             avk    = (last / float(df["Close"].iloc[0]) - 1) * 100
-            vol    = ret.std() * np.sqrt(252) * 100
-            sharpe = (ret.mean() - RISIKOFRI_RENTE/252) / ret.std() * np.sqrt(252)
+            ret_std = ret.std()
+            vol    = ret_std * np.sqrt(252) * 100
+            sharpe = (ret.mean() - RISIKOFRI_RENTE/252) / ret_std * np.sqrt(252) if ret_std and not np.isnan(ret_std) else float("nan")
             dd     = ((df["Close"] - df["Close"].cummax()) / df["Close"].cummax()).min() * 100
 
             # Beta using pre-downloaded benchmark
@@ -1466,7 +1499,7 @@ def api_sammenlign():
                 "avk":          round(avk, 2),
                 "avk_perioder": avk_data,
                 "vol":          round(vol, 2),
-                "sharpe":       round(sharpe, 3),
+                "sharpe":       round(sharpe, 3) if not np.isnan(sharpe) else None,
                 "max_dd":       round(dd, 2),
                 "beta":         beta,
                 "historikk":    historikk,
@@ -1496,6 +1529,13 @@ Your analysis must cover:
 5. **Final Ranking** — rank all stocks from most to least attractive right now, with one sentence per stock
 
 Be decisive. A client is making a real allocation decision. Max 300 words.
+
+FINAL INSTRUCTION:
+{AI_GUARDRAILS}
+- Rank the stocks strictly on the supplied metrics and context above.
+- Do not invent business descriptions, catalysts, or company-specific developments that are not in the input.
+- If a stock has missing data, say so explicitly and reduce confidence.
+- Be willing to say when the ranking is close or the evidence is mixed.
 """
         ai_tekst = spør_ai(prompt, gemini_key, 1200)
 
@@ -1503,7 +1543,7 @@ Be decisive. A client is making a real allocation decision. Max 300 words.
 
 @app.route("/api/portefolje_analyse", methods=["POST"])
 def api_portefolje_analyse():
-    data       = request.json
+    data       = get_request_data()
     posisjoner = data.get("posisjoner", [])
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
@@ -1532,8 +1572,9 @@ def api_portefolje_analyse():
             gain_pct   = (gain / kostnad) * 100
 
             ret    = df["Close"].pct_change().dropna()
-            vol    = ret.std()*np.sqrt(252)*100
-            sharpe = (ret.mean()-RISIKOFRI_RENTE/252)/ret.std()*np.sqrt(252)
+            ret_std = ret.std()
+            vol    = ret_std*np.sqrt(252)*100
+            sharpe = (ret.mean()-RISIKOFRI_RENTE/252)/ret_std*np.sqrt(252) if ret_std and not np.isnan(ret_std) else float("nan")
 
             total_verdi   += curr_value
             total_kostnad += kostnad
@@ -1556,7 +1597,7 @@ def api_portefolje_analyse():
                 "gevinst":   round(gain, 2),
                 "pst":       round(gain_pct, 2),
                 "vol":       round(vol, 2),
-                "sharpe":    round(sharpe, 3),
+                "sharpe":    round(sharpe, 3) if not np.isnan(sharpe) else None,
                 "pe":        safe(info.get("trailingPE")),
                 "konsensus": info.get("recommendationKey","N/A").upper(),
                 "mål":       safe(info.get("targetMeanPrice")),
@@ -1604,6 +1645,13 @@ Provide a professional portfolio review:
 7. **Risk Rating: LOW / MEDIUM / HIGH** — overall portfolio risk with explanation
 
 Be direct and action-oriented. This client needs clear guidance. Max 380 words.
+
+FINAL INSTRUCTION:
+{AI_GUARDRAILS}
+- Base the review only on the holdings, weights, sectors, returns, and valuation metrics provided above.
+- Do not assume tax situation, account type, liquidity needs, or investment horizon beyond what is stated.
+- Make the risk discussion concrete: concentration, diversification, factor balance, and weakest links.
+- If evidence is insufficient for a strong call on a position, say that explicitly.
 """
         ai_tekst = spør_ai(prompt, gemini_key, 1500)
 
@@ -1619,7 +1667,7 @@ Be direct and action-oriented. This client needs clear guidance. Max 380 words.
 
 @app.route("/api/nyheter", methods=["POST"])
 def api_nyheter():
-    data     = request.json
+    data     = get_request_data()
     ticker   = data.get("ticker","").strip().upper()
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
     if not ticker:
@@ -1665,6 +1713,13 @@ Provide:
 3. **Price Impact** — what this news flow suggests for near-term price action (be specific)
 
 Max 120 words. Focus on what actually moves the stock price.
+
+FINAL INSTRUCTION:
+{AI_GUARDRAILS}
+- Base the conclusion only on the headlines above.
+- Do not assume facts, financial impact, or company events beyond what the headlines state.
+- If the headlines are mixed or thin, say the signal is mixed or low-confidence.
+- Keep the sentiment label explicitly as POSITIVE, NEUTRAL, or NEGATIVE.
 """
             ai_sentiment = spør_ai(prompt, gemini_key, 400)
 
@@ -1674,7 +1729,7 @@ Max 120 words. Focus on what actually moves the stock price.
 
 @app.route("/api/watchlist_kurs", methods=["POST"])
 def api_watchlist_kurs():
-    data    = request.json
+    data    = get_request_data()
     tickers = data.get("tickers", [])
     if not tickers:
         return safe_jsonify([])
