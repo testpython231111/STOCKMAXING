@@ -69,7 +69,7 @@
   [data-theme="light"] .welcome-card { background: rgba(255,255,255,0.9); }
 
 
-  /* —— Splash screen —— */
+  /* ── Splash screen ── */
   #splash {
     position: fixed; inset: 0; z-index: 9999;
     background: #06090F;
@@ -146,7 +146,7 @@
     overflow-x: hidden;
   }
 
-  /* —— Scanline overlay —— */
+  /* ── Scanline overlay ── */
   body::before {
     content: '';
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -156,7 +156,7 @@
     );
   }
 
-  /* —— Top bar —— */
+  /* ── Top bar ── */
   .topbar {
     position: sticky; top: 0; z-index: 100;
     background: rgba(10,18,32,0.88);
@@ -232,7 +232,7 @@
 
   .clock { color: var(--green2); font-size: 11px; white-space: nowrap; }
 
-  /* —— Layout —— */
+  /* ── Layout ── */
   .layout {
     display: grid;
     grid-template-columns: 260px 1fr;
@@ -241,7 +241,7 @@
     position: relative; z-index: 1;
   }
 
-  /* —— Sidebar —— */
+  /* ── Sidebar ── */
   .sidebar {
     background:
       linear-gradient(180deg, rgba(10,18,32,0.98), rgba(6,9,15,0.98));
@@ -313,7 +313,7 @@
   }
   .nav-icon { font-size: 13px; width: 16px; text-align: center; }
 
-  /* —— Main content —— */
+  /* ── Main content ── */
   .main {
     overflow-y: auto;
     padding: 16px 20px;
@@ -363,7 +363,7 @@
     transform: translateY(0);
   }
 
-  /* —— Panel —— */
+  /* ── Panel ── */
   .panel {
     background:
       linear-gradient(180deg, rgba(10,18,32,0.98), rgba(6,9,15,0.98));
@@ -620,7 +620,7 @@
     font-size: 10px;
   }
 
-  /* —— Stock header —— */
+  /* ── Stock header ── */
   .stock-header {
     display: grid; grid-template-columns: 1fr auto;
     gap: 12px; align-items: start;
@@ -634,7 +634,7 @@
   .neg { color: var(--red); }
   .neu { color: var(--text2); }
 
-  /* —— Tables —— */
+  /* ── Tables ── */
   .data-grid {
     display: grid; grid-template-columns: 1fr 1fr;
     gap: 1px; background: var(--border);
@@ -659,7 +659,7 @@
   }
   .data-table tr:hover td { background: var(--bg3); }
 
-  /* —— Signal badges —— */
+  /* ── Signal badges ── */
   .signal {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 2px 8px; font-size: 10px; letter-spacing: 1px;
@@ -669,7 +669,7 @@
   .signal-bear { border-color: var(--red);    color: var(--red);   }
   .signal-neu  { border-color: var(--text2);  color: var(--text2); }
 
-  /* —— Signal grid —— */
+  /* ── Signal grid ── */
   .signal-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
     gap: 8px;
@@ -682,7 +682,7 @@
   .sig-val   { font-size: 14px; font-weight: 500; }
   .sig-sub   { font-size: 9px; color: var(--text2); margin-top: 2px; }
 
-  /* —— Margin of Safety widget —— */
+  /* ── Margin of Safety widget ── */
   .mos-widget {
     margin: 10px 0 0 0;
     border: 1px solid var(--border);
@@ -727,7 +727,7 @@
   .dot-bear { background: var(--red); }
   .mos-dcf-pending { font-size:9px; color:var(--text2); font-style:italic; }
 
-  /* —— Margin of Safety —— */
+  /* ── Margin of Safety ── */
   .mos-overall {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
     padding: 14px 18px; margin-bottom: 16px;
@@ -769,7 +769,7 @@
   .mos-pill.yellow { background: rgba(240,180,41,0.12); color: var(--yellow); border: 1px solid var(--yellow); }
   .mos-pill.red { background: rgba(224,84,112,0.12); color: var(--red); border: 1px solid var(--red); }
 
-  /* —— DCF panel —— */
+  /* ── DCF panel ── */
   .dcf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
   @media(max-width:700px) { .dcf-grid { grid-template-columns: 1fr; } }
   .dcf-scenario {
@@ -836,7 +836,7 @@
     border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px;
   }
 
-  /* —— AI panel —— */
+  /* ── AI panel ── */
   .ai-text {
     font-family: 'IBM Plex Sans', sans-serif;
     font-size: 13px; line-height: 1.7;
@@ -888,7 +888,7 @@
     line-height: 1.6;
   }
 
-  /* —— Consensus badge —— */
+  /* ── Consensus badge ── */
   .consensus {
     display: inline-block; padding: 3px 12px;
     font-size: 11px; letter-spacing: 2px; font-weight: 600;
@@ -897,7 +897,7 @@
   .cons-hold { background: rgba(255,209,102,0.1); color: var(--yellow); border: 1px solid var(--yellow); }
   .cons-sell { background: rgba(255,51,102,0.1);  color: var(--red);    border: 1px solid var(--red); }
 
-  /* —— Loader —— */
+  /* ── Loader ── */
   .loader {
     position: absolute;
     inset: 0;
@@ -934,10 +934,10 @@
     66% { content: '...'; }
   }
 
-  /* —— Graf —— */
+  /* ── Graf ── */
   .graf-img { width: 100%; display: block; }
 
-  /* —— Makro ticker —— */
+  /* ── Makro ticker ── */
   .makro-grid {
     display: grid; grid-template-columns: repeat(8, 1fr);
     gap: 1px; background: var(--border);
@@ -956,11 +956,11 @@
   .makro-val   { font-size: 15px; color: var(--text3); }
   .makro-chg   { font-size: 10px; margin-top: 2px; }
 
-  /* —— Compare table —— */
+  /* ── Compare table ── */
   .compare-best { color: var(--green); }
   .compare-worst { color: var(--red); }
 
-  /* —— Tabs —— */
+  /* ── Tabs ── */
   .tabs {
     display: flex;
     gap: 2px;
@@ -1020,13 +1020,13 @@
   .ticker-flash-up  { animation: flashGreen 1.2s ease forwards; }
   .ticker-flash-dn  { animation: flashRed   1.2s ease forwards; }
 
-  /* —— Scrollbar —— */
+  /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: var(--bg2); }
   ::-webkit-scrollbar-thumb { background: var(--border); }
   ::-webkit-scrollbar-thumb:hover { background: var(--green2); }
 
-  /* —— Error/info —— */
+  /* ── Error/info ── */
   .alert {
     padding: 10px 14px; font-size: 11px;
     border-left: 3px solid;
@@ -1035,10 +1035,10 @@
   .alert-info  { border-color: var(--text2);  color: var(--text2);  background: transparent; }
   .alert-success{border-color: var(--green2); color: var(--green);  background: rgba(74,158,214,0.06); }
 
-  /* —— Groq key section —— */
+  /* ── Groq key section ── */
   .key-section { background: rgba(255,209,102,0.03); border: 1px solid rgba(255,209,102,0.2); padding: 10px; }
 
-  /* —— News —— */
+  /* ── News ── */
   .news-item {
     padding: 10px 0; border-bottom: 1px solid var(--border);
     display: flex; flex-direction: column; gap: 4px;
@@ -1051,7 +1051,7 @@
   .news-tittel:hover { color: var(--green); }
   .news-meta { font-size: 10px; color: var(--text2); display: flex; gap: 10px; }
 
-  /* —— Sparkline —— */
+  /* ── Sparkline ── */
   .sparkline { width: 80px; height: 28px; }
   .macro-overview-grid {
     display: grid;
@@ -1347,7 +1347,7 @@
     }
   }
 
-  /* —— Mobile hamburger —— */
+  /* ── Mobile hamburger ── */
   .hamburger {
     display: none; flex-direction: column; gap: 4px;
     cursor: pointer; padding: 4px; flex-shrink: 0;
@@ -1357,7 +1357,7 @@
     background: var(--green); transition: all 0.2s;
   }
 
-  /* —— PDF Export button —— */
+  /* ── PDF Export button ── */
   .pdf-btn {
     background: none; border: 1px solid var(--border);
     color: var(--text2); font-family: 'IBM Plex Mono', monospace;
@@ -1371,7 +1371,7 @@
   }
   .pdf-btn:hover { border-color: var(--green2); color: var(--green); }
 
-  /* —— Mobile styles —— */
+  /* ── Mobile styles ── */
   @media (max-width: 768px) {
     .hamburger { display: flex; }
     .ticker-bar { display: none; }
@@ -1478,7 +1478,7 @@
     .welcome-chip { min-width: 0; width: calc(50% - 16px); }
   }
 
-  /* —— Print / PDF styles —— */
+  /* ── Print / PDF styles ── */
   button:focus-visible,
   input:focus-visible,
   select:focus-visible,
@@ -1524,7 +1524,7 @@
     #welcome { display: none !important; }
   }
 
-  /* —— Watchlist row —— */
+  /* ── Watchlist row ── */
   .wl-row {
     display: grid;
     grid-template-columns: 90px 1fr 80px 70px 60px 60px 80px 80px;
@@ -1565,7 +1565,7 @@
     <div id="markedStatus" style="font-size:9px;letter-spacing:1px"></div>
     <div class="clock" id="clock">--:--:--</div>
     <button onclick="toggleTheme()" id="themeBtn" class="theme-btn"
-      title="Toggle light/dark mode">ðŸŒ™ DARK</button>
+      title="Toggle light/dark mode">🌙 DARK</button>
   </div>
 </div>
 
@@ -1625,29 +1625,29 @@
 
     <nav>
       <div class="nav-item active" onclick="visView('analyse')" id="nav-analyse">
-        <span class="nav-icon">ðŸ“Š</span> STOCK ANALYSIS
+        <span class="nav-icon">📊</span> STOCK ANALYSIS
       </div>
       <div class="nav-item" onclick="visView('markedsoversikt')" id="nav-markedsoversikt">
-        <span class="nav-icon">ðŸŒ</span> MARKET OVERVIEW
+        <span class="nav-icon">🌐</span> MARKET OVERVIEW
       </div>
       <div class="nav-item" onclick="visView('watchlist')" id="nav-watchlist">
         <span class="nav-icon">⭐</span> WATCHLIST
       </div>
       <div class="nav-item" onclick="visView('portefolje')" id="nav-portefolje">
-        <span class="nav-icon">ðŸ’¼</span> PORTFOLIO
+        <span class="nav-icon">💼</span> PORTFOLIO
       </div>
       <div class="nav-item" onclick="visView('sammenlign')" id="nav-sammenlign">
         <span class="nav-icon">⚖</span> COMPARE
       </div>
       <div class="nav-item" onclick="visView('sektorer')" id="nav-sektorer">
-        <span class="nav-icon">ðŸ­</span> SECTORS
+        <span class="nav-icon">🏭</span> SECTORS
       </div>
     </nav>
 
     <div style="margin-top:auto; font-size:9px; color:var(--text2); line-height:1.6">
       Data: Yahoo Finance<br>
       AI: Gemini 2.5 Flash<br>
-      ⚙  Not financial advice
+      ⚠ Not financial advice
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
@@ -1786,12 +1786,12 @@
               <div id="chartTab-tv" data-chart-tab="tv" onclick="byttChartTab('tv', this)"
                 style="padding:8px 16px;font-size:10px;letter-spacing:1px;cursor:pointer;
                        color:var(--green);border-bottom:2px solid var(--green)">
-                ðŸ“ˆ TRADINGVIEW
+                📈 TRADINGVIEW
               </div>
               <div id="chartTab-tech" data-chart-tab="tech" onclick="byttChartTab('tech', this)"
                 style="padding:8px 16px;font-size:10px;letter-spacing:1px;cursor:pointer;
                        color:var(--text2);border-bottom:2px solid transparent">
-                ðŸ“Š TECHNICAL (MA/RSI/MACD)
+                📊 TECHNICAL (MA/RSI/MACD)
               </div>
             </div>
             <div id="chartPane-tv"></div>
@@ -1858,7 +1858,7 @@
       <!-- Legg til posisjon -->
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">ðŸ’¼ PORTFOLIO TRACKER</span>
+          <span class="panel-title">💼 PORTFOLIO TRACKER</span>
           <button class="btn" onclick="analyserPortefolje()" style="width:auto;padding:4px 14px;font-size:10px">
             ▶ AI ANALYZE PORTFOLIO
           </button>
@@ -1921,7 +1921,7 @@
     <div id="view-sektorer" class="view-section">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">ðŸ­ SECTOR PERFORMANCE</span>
+          <span class="panel-title">🏭 SECTOR PERFORMANCE</span>
           <div style="display:flex;gap:4px">
             <button class="sektor-period-btn" data-p="1d" onclick="byttSektorPeriode('1d')"
               style="background:rgba(45,122,184,0.15);border:1px solid var(--green2);color:var(--white);
@@ -1966,7 +1966,7 @@
       <!-- AI Daily Briefing -->
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">ðŸŒ MARKET OVERVIEW</span>
+          <span class="panel-title">🌐 MARKET OVERVIEW</span>
           <button class="btn" onclick="lastMarkedsOversikt(true)" style="width:auto;padding:4px 14px;font-size:10px">↻ REFRESH</button>
         </div>
         <div class="panel-body" id="markedsIntro">
@@ -1984,7 +1984,7 @@
 
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title" id="macroFocusTitle">ðŸ“ˆ MACRO FOCUS</span>
+          <span class="panel-title" id="macroFocusTitle">📈 MACRO FOCUS</span>
           <span class="panel-badge" id="macroFocusBadge">LIVE</span>
         </div>
         <div class="panel-body">
@@ -2007,7 +2007,7 @@
 </div>
 
 <script>
-// —— State —————————————————————————————————————————————————————————————————————
+// ── State ─────────────────────────────────────────────────────────────────────
 let sisteTicker = null;
 let portefolje  = [];
 let analyseState = {
@@ -2028,7 +2028,7 @@ const TAB_TRANSITION_MS = prefersReducedMotion ? 0 : 140;
 let splashDismissed = false;
 let splashFallbackTimer = null;
 
-// —— Clock —————————————————————————————————————————————————————————————————————
+// ── Clock ─────────────────────────────────────────────────────────────────────
 function oppdaterKlokke() {
   document.getElementById("clock").textContent =
     new Date().toLocaleTimeString("no-NO");
@@ -2147,7 +2147,7 @@ async function initApp() {
 window.addEventListener("load", initApp);
 scheduleSplashFallback();
 
-// —— View switching ————————————————————————————————————————————————————————————
+// ── View switching ────────────────────────────────────────────────────────────
 function visView(navn) {
   ["analyse","sammenlign","portefolje","watchlist","sektorer","markedsoversikt"].forEach(v => {
     const el = document.getElementById("view-"+v);
@@ -2160,7 +2160,7 @@ function visView(navn) {
   if (navn==="markedsoversikt") lastMarkedsOversikt();
 }
 
-// —— Tabs ——————————————————————————————————————————————————————————————————————
+// ── Tabs ──────────────────────────────────────────────────────────────────────
 async function byttTab(navn, el = null) {
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   (el || document.querySelector(`[data-tab="${navn}"]`))?.classList.add("active");
@@ -2450,7 +2450,7 @@ async function lastEarnings(ticker) {
   }
 }
 
-// —— Loader ————————————————————————————————————————————————————————————————————
+// ── Loader ────────────────────────────────────────────────────────────────────
 function visLoader(msg) {
   document.getElementById("loader").classList.add("active");
   document.getElementById("loaderMsg").textContent = msg || "Fetching data...";
@@ -2459,7 +2459,7 @@ function skjulLoader() {
   document.getElementById("loader").classList.remove("active");
 }
 
-// —— Format helpers ————————————————————————————————————————————————————————————
+// ── Format helpers ────────────────────────────────────────────────────────────
 function fargeTall(v, suffix="") {
   if (v === null || v === undefined || v === "N/A") return `<span class="neu">N/A</span>`;
   const n = parseFloat(v);
@@ -2661,7 +2661,7 @@ async function lastDCF(ticker) {
     const w    = d.wacc;
     const sens = d.sensitivity;
 
-    // —— Sensitivity cell colouring ——————————————————————————————————————
+    // ── Sensitivity cell colouring ──────────────────────────────────────
     // Cells are colour-coded relative to current price
     function sensCellStyle(iv) {
       if (!iv || !cur) return "";
@@ -2686,7 +2686,7 @@ async function lastDCF(ticker) {
       return v !== null && v !== undefined ? `${d.currency === 'NOK' ? 'kr' : '$'}${v.toFixed(2)}` : "N/A";
     }
 
-    // —— WACC breakdown cards —————————————————————————————————————————————
+    // ── WACC breakdown cards ─────────────────────────────────────────────
     const waccCards = [
       {k:"WACC",         v: w.total + "%"},
       {k:"COST OF EQUITY",v:`${w.costEquity}%`},
@@ -2702,7 +2702,7 @@ async function lastDCF(ticker) {
         <div class="wv">${x.v}</div>
       </div>`).join("");
 
-    // —— Sensitivity matrix ———————————————————————————————————————————————
+    // ── Sensitivity matrix ───────────────────────────────────────────────
     const sensHeaders = sens.wacc_labels.map((l,i) =>
       `<th style="${i===sens.base_w_idx?'color:var(--yellow);border-bottom:2px solid var(--yellow)':''}">${l}</th>`
     ).join("");
@@ -2720,7 +2720,7 @@ async function lastDCF(ticker) {
       </tr>`;
     }).join("");
 
-    // —— FCF projection table —————————————————————————————————————————————
+    // ── FCF projection table ─────────────────────────────────────────────
     const fcfRows = d.fcfTable.map(r => `
       <tr>
         <td>Year ${r.year}</td>
@@ -2728,7 +2728,7 @@ async function lastDCF(ticker) {
         <td>${d.currency === 'NOK' ? 'kr' : '$'}${r.pv}B</td>
       </tr>`).join("");
 
-    // —— MoS overall + signals ————————————————————————————————————————————
+    // ── MoS overall + signals ────────────────────────────────────────────
     const mos     = d.mos || [];
     const mosOver = d.mosOverall || {verdict:"N/A", color:"yellow", desc:""};
 
@@ -2742,7 +2742,7 @@ async function lastDCF(ticker) {
         <div class="mos-signal-note">${s.note}</div>
       </div>`).join("");
 
-    // —— Also fill Fundamental tab MoS section ———————————————————————————
+    // ── Also fill Fundamental tab MoS section ───────────────────────────
     const fundMos = document.getElementById("fund-mos-body");
     if (fundMos) {
       if (!mos.length) {
@@ -2778,13 +2778,13 @@ async function lastDCF(ticker) {
       }
     }
 
-    // —— Render ———————————————————————————————————————————————————————————
+    // ── Render ───────────────────────────────────────────────────────────
     const sc   = d.scenarios;
     const base = sc.Base;
     const bear = sc.Bear;
     const bull = sc.Bull;
 
-    // —— Update MoS widget with DCF upside now that we have it ————————————
+    // ── Update MoS widget with DCF upside now that we have it ────────────
     if (window._mosF && base.upside !== null && base.upside !== undefined) {
       beregnMoS(window._mosF, base.upside);
     }
@@ -2843,7 +2843,7 @@ async function lastDCF(ticker) {
         <div class="dcf-grid" style="margin-bottom:20px">
 
           <div class="dcf-scenario bear">
-            <div class="dcf-scenario-label">● BEAR CASE</div>
+            <div class="dcf-scenario-label">● BEAR CASE</div>
             <div class="dcf-iv">${fmtIV(bear.intrinsic)}</div>
             <div class="dcf-upside">${scenarioUpside(bear)}</div>
             <div class="dcf-params">
@@ -2854,7 +2854,7 @@ async function lastDCF(ticker) {
           </div>
 
           <div class="dcf-scenario base">
-            <div class="dcf-scenario-label">●† BASE CASE</div>
+            <div class="dcf-scenario-label">◆ BASE CASE</div>
             <div class="dcf-iv">${fmtIV(base.intrinsic)}</div>
             <div class="dcf-upside">${scenarioUpside(base)}</div>
             <div class="dcf-params">
@@ -2918,7 +2918,7 @@ async function lastDCF(ticker) {
 
         <!-- Disclaimer -->
         <div class="dcf-disclaimer">
-          ⚙  DCF assumptions: 2-stage model — 5-year explicit FCF projection + Gordon Growth terminal value.
+          ⚠ DCF assumptions: 2-stage model — 5-year explicit FCF projection + Gordon Growth terminal value.
           WACC uses CAPM (Rf=${w.rf}%, ERP=${w.erp}%) for equity and book cost for debt.
           FCF source: ${d.assumptions?.fcfSource || "Reported free cash flow"}.
           Sector-adjusted base growth: ${d.sector || "General"} (${d.baseGrowth}% p.a.).
@@ -2964,8 +2964,8 @@ async function lastAI(ticker, periode) {
   }
 }
 
-// —— Vis resultat ——————————————————————————————————————————————————————————————
-// —— Margin of Safety —————————————————————————————————————————————————————————
+// ── Vis resultat ──────────────────────────────────────────────────────────────
+// ── Margin of Safety ─────────────────────────────────────────────────────────
 // Scoring: each signal gives -2 / -1 / 0 / +1 / +2
 // Total score mapped to verdict: STRONG BUY / UNDERVALUED / FAIR / OVERVALUED / STRONG SELL
 window._mosState = { signals: {}, dcfUpside: null };
@@ -2997,7 +2997,7 @@ function beregnMoS(f, dcfUpside = null) {
     scoredCount++;
   }
 
-  // —— 1. Graham Number ——————————————————————————————————————————————————————
+  // ── 1. Graham Number ──────────────────────────────────────────────────────
   if (eps > 0 && pb > 0 && price > 0) {
     const bvps      = price / pb;                          // book value/share
     const graham    = Math.sqrt(22.5 * eps * bvps);
@@ -3007,7 +3007,7 @@ function beregnMoS(f, dcfUpside = null) {
     addSignal("graham", "Graham Number", grahamPct, sc, grahamFmt);
   }
 
-  // —— 2. PEG Ratio ——————————————————————————————————————————————————————————
+  // ── 2. PEG Ratio ──────────────────────────────────────────────────────────
   if (!isNaN(peg) && peg > 0) {
     const pegFmt = peg.toFixed(2);
     const sc = peg < 0.8 ? 2 : peg < 1.2 ? 1 : peg < 2.0 ? 0 : peg < 3.0 ? -1 : -2;
@@ -3019,28 +3019,28 @@ function beregnMoS(f, dcfUpside = null) {
     addSignal("peg", "PEG (calc.)", pegCalc, sc, `${pegCalc.toFixed(2)} ${pegCalc < 1 ? '(undervalued)' : pegCalc < 2 ? '(fair)' : '(expensive)'}`);
   }
 
-  // —— 3. EV/EBITDA vs sector benchmarks ————————————————————————————————————
+  // ── 3. EV/EBITDA vs sector benchmarks ────────────────────────────────────
   if (!isNaN(evEb) && evEb > 0) {
     // Rough sector-neutral threshold: <12 cheap, 12-20 fair, >20 expensive
     const sc = evEb < 8 ? 2 : evEb < 13 ? 1 : evEb < 20 ? 0 : evEb < 30 ? -1 : -2;
     addSignal("evebitda", "EV/EBITDA", evEb, sc, `${evEb.toFixed(1)}x ${evEb < 13 ? '(cheap)' : evEb < 20 ? '(fair)' : '(expensive)'}`);
   }
 
-  // —— 4. Analyst target gap —————————————————————————————————————————————————
+  // ── 4. Analyst target gap ─────────────────────────────────────────────────
   if (!isNaN(target) && !isNaN(price) && price > 0) {
     const analystUp = (target - price) / price * 100;
     const sc = analystUp > 30 ? 2 : analystUp > 10 ? 1 : analystUp > -5 ? 0 : analystUp > -20 ? -1 : -2;
     addSignal("analyst", "Analyst Target", analystUp, sc, `$${target.toFixed(2)} (${analystUp >= 0 ? '+' : ''}${analystUp.toFixed(1)}% upside)`);
   }
 
-  // —— 5. 52-week position (distance from low = buffer) —————————————————————
+  // ── 5. 52-week position (distance from low = buffer) ─────────────────────
   if (!isNaN(hi52) && !isNaN(lo52) && lo52 > 0) {
     const rangePct = (price - lo52) / (hi52 - lo52) * 100; // 0% = at low, 100% = at high
     const sc = rangePct < 20 ? 2 : rangePct < 40 ? 1 : rangePct < 65 ? 0 : rangePct < 85 ? -1 : -2;
     addSignal("52w", "52w Position", rangePct, sc, `${rangePct.toFixed(0)}% of range — ${rangePct < 30 ? 'near low' : rangePct > 75 ? 'near high' : 'mid-range'}`);
   }
 
-  // —— 6. Analyst consensus ——————————————————————————————————————————————————
+  // ── 6. Analyst consensus ──────────────────────────────────────────────────
   const consMap = {
     "strong_buy": 2, "buy": 1, "outperform": 1,
     "hold": 0, "neutral": 0,
@@ -3051,13 +3051,13 @@ function beregnMoS(f, dcfUpside = null) {
     addSignal("consensus", "Wall St. Consensus", sc, sc, konsens.replace(/_/g, " ").toUpperCase());
   }
 
-  // —— 7. DCF upside (injected async from lastDCF) ———————————————————————————
+  // ── 7. DCF upside (injected async from lastDCF) ───────────────────────────
   if (dcfUpside !== null && !isNaN(dcfUpside)) {
     const sc = dcfUpside > 30 ? 2 : dcfUpside > 10 ? 1 : dcfUpside > -10 ? 0 : dcfUpside > -30 ? -1 : -2;
     addSignal("dcf", "DCF Base Case", dcfUpside, sc, `${dcfUpside >= 0 ? '+' : ''}${dcfUpside.toFixed(1)}% vs current price`);
   }
 
-  // —— Aggregate score & verdict —————————————————————————————————————————————
+  // ── Aggregate score & verdict ─────────────────────────────────────────────
   const maxPossible = scoredCount * 2;
   const minPossible = scoredCount * -2;
   const normalised  = maxPossible > 0
@@ -3071,7 +3071,7 @@ function beregnMoS(f, dcfUpside = null) {
   else if (normalised >= 25) { verdict = "OVERVALUED";   badgeClass = "overvalued";  barColor = "#E05470"; }
   else                       { verdict = "STRONG SELL";  badgeClass = "strong-sell"; barColor = "#c0392b"; }
 
-  // —— Render ————————————————————————————————————————————————————————————————
+  // ── Render ────────────────────────────────────────────────────────────────
   function dotClass(sc) {
     return sc >= 1 ? "dot-bull" : sc <= -1 ? "dot-bear" : "dot-neu";
   }
@@ -3117,7 +3117,7 @@ function beregnMoS(f, dcfUpside = null) {
       </div>
       <div class="mos-signals">${signalCards}</div>
       <div style="font-size:9px;color:var(--text2);margin-top:8px">
-        ⚙  MoS score is mechanical — based on Graham Number, PEG, EV/EBITDA, analyst targets, 52w position, Wall St. consensus${dcfUpside !== null ? ', and DCF' : ''}. Not financial advice.
+        ⚠ MoS score is mechanical — based on Graham Number, PEG, EV/EBITDA, analyst targets, 52w position, Wall St. consensus${dcfUpside !== null ? ', and DCF' : ''}. Not financial advice.
       </div>
     </div>`;
 }
@@ -3140,7 +3140,7 @@ function visResultat(d) {
   document.getElementById("chartTab-tech").style.color = "var(--text2)";
   document.getElementById("chartTab-tech").style.borderBottom = "2px solid transparent";
 
-  // —— Header ——
+  // ── Header ──
   const prisen = parseFloat(f.pris);
   const mål    = parseFloat(f.mål);
   const upside = (!isNaN(prisen) && !isNaN(mål)) ? ((mål-prisen)/prisen*100).toFixed(1) : null;
@@ -3183,7 +3183,7 @@ function visResultat(d) {
   window._mosF = f;
   beregnMoS(f, null);
 
-  // —— Teknisk ——
+  // ── Teknisk ──
   const rsiCls = s.rsi < 30 ? "pos" : s.rsi > 70 ? "neg" : "neu";
   const bbTekst = s.bb_pct < 0 ? "Below lower band" : s.bb_pct > 1 ? "Above upper band" : `Within (${s.bb_pct})`;
   const bbCls   = s.bb_pct < 0 ? "signal-bull" : s.bb_pct > 1 ? "signal-bear" : "signal-neu";
@@ -3234,7 +3234,7 @@ function visResultat(d) {
       </div>
     </div>`;
 
-  // —— Fundamental ——
+  // ── Fundamental ──
   const fundRader = [
     ["P/E (TTM)", f.pe], ["Forward P/E", f.forward_pe],
     ["P/B", f.pb], ["P/S", f.ps],
@@ -3265,7 +3265,7 @@ function visResultat(d) {
       </div>
     </div>`;
 
-  // —— Risiko ——
+  // ── Risiko ──
   if (!r || Object.keys(r).length === 0) {
     document.getElementById("pane-risiko").innerHTML =
       `<div class="alert alert-info">Not enough data to calculate risk metrics.</div>`;
@@ -3324,7 +3324,7 @@ function visResultat(d) {
   }, 250);
 }
 
-// —— Makro (kun topplinje) —————————————————————————————————————————————————————
+// ── Makro (kun topplinje) ─────────────────────────────────────────────────────
 function updateMarketStatus(isOpen) {
   const statusEl = document.getElementById("markedStatus");
   if (!statusEl) return;
@@ -3430,15 +3430,15 @@ async function lastMakro() {
     const nå = new Date();
     const utc = nå.getUTCHours() * 60 + nå.getUTCMinutes();
     const dag = nå.getUTCDay();
-    const erÃ…pen = dag >= 1 && dag <= 5 && utc >= 870 && utc < 1260;
+    const erÅpen = dag >= 1 && dag <= 5 && utc >= 870 && utc < 1260;
     // Legacy block kept below for reference, but disabled by the early return above.
     updateTickerBar(data);
     return;
     const statusEl = document.getElementById("markedStatus");
     if (statusEl) {
-      statusEl.innerHTML = erÃ…pen
-        ? `<span class="market-open">● US OPEN</span>`
-        : `<span class="market-closed">● US CLOSED</span>`;
+      statusEl.innerHTML = erÅpen
+        ? `<span class="market-open">● US OPEN</span>`
+        : `<span class="market-closed">● US CLOSED</span>`;
     }
 
     const tooltips = {
@@ -3488,14 +3488,14 @@ async function lastMakro() {
 // Oppdater makro hvert 60 sek
 setInterval(lastMakro, 300000); // poll every 5 minutes
 
-// —— Click on topbar ticker to analyze it —————————————————————————————————————
+// ── Click on topbar ticker to analyze it ─────────────────────────────────────
 function analyserMakro(ticker) {
   document.getElementById("tickerInput").value = ticker;
   visView("analyse");
   runAnalysis();
 }
 
-// —— Market Overview ———————————————————————————————————————————————————————————
+// ── Market Overview ───────────────────────────────────────────────────────────
 function formatPctChange(value) {
   const num = Number(value || 0);
   return `${num >= 0 ? "+" : ""}${num.toFixed(2)}%`;
@@ -3629,7 +3629,7 @@ async function loadMarketOverviewBrief(rows, force = false) {
 }
 
 
-// —— Sammenlign ————————————————————————————————————————————————————————————————
+// ── Sammenlign ────────────────────────────────────────────────────────────────
 function runCompare() {
   return kjørSammenlign();
 }
@@ -3753,7 +3753,7 @@ async function kjørSammenlign() {
   }
 }
 
-// —— Portefølje ————————————————————————————————————————————————————————————————
+// ── Portefølje ────────────────────────────────────────────────────────────────
 function leggTilPosisjon() {
   const ticker = document.getElementById("pfTicker").value.trim().toUpperCase();
   const antall = parseFloat(document.getElementById("pfAntall").value);
@@ -3935,7 +3935,7 @@ async function analyserPortefoljeData(medAI) {
   }
 }
 
-// —— Nyheter ———————————————————————————————————————————————————————————————————
+// ── Nyheter ───────────────────────────────────────────────────────────────────
 async function lastAnalyst(ticker) {
   const pane = document.getElementById("pane-analyst");
   if (!pane) return;
@@ -3961,11 +3961,11 @@ async function lastAnalyst(ticker) {
           <div style="width:${pct(d.strongSell)}%;background:var(--red)" title="Strong Sell"></div>
         </div>
         <div style="display:flex;gap:16px;font-size:10px;flex-wrap:wrap">
-          <span style="color:#00cc66">▪  STRONG BUY ${d.strongBuy||0}</span>
-          <span style="color:#00ff88">▪  BUY ${d.buy||0}</span>
-          <span style="color:var(--yellow)">▪  HOLD ${d.hold||0}</span>
-          <span style="color:#ff8844">▪  SELL ${d.sell||0}</span>
-          <span style="color:var(--red)">▪  STRONG SELL ${d.strongSell||0}</span>
+          <span style="color:#00cc66">■ STRONG BUY ${d.strongBuy||0}</span>
+          <span style="color:#00ff88">■ BUY ${d.buy||0}</span>
+          <span style="color:var(--yellow)">■ HOLD ${d.hold||0}</span>
+          <span style="color:#ff8844">■ SELL ${d.sell||0}</span>
+          <span style="color:var(--red)">■ STRONG SELL ${d.strongSell||0}</span>
           <span style="color:var(--text2);margin-left:auto">${total} analysts</span>
         </div>
       </div>` : "";
@@ -4315,7 +4315,7 @@ async function lastNyheter(ticker) {
   }
 }
 
-// —— Watchlist —————————————————————————————————————————————————————————————————
+// ── Watchlist ─────────────────────────────────────────────────────────────────
 let watchlist = JSON.parse(localStorage.getItem("watchlist") || "[]");
 let wlPriser  = {};  // cache: ticker -> price data
 
@@ -4398,7 +4398,7 @@ async function oppdaterWatchlist() {
 
 window.addEventListener("load", () => { tegnWatchlist(); });
 
-// —— Mobile sidebar toggle —————————————————————————————————————————————————————
+// ── Mobile sidebar toggle ─────────────────────────────────────────────────────
 function toggleSidebar(force) {
   const sidebar = document.querySelector('.sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
@@ -4419,7 +4419,7 @@ document.querySelectorAll('.nav-item').forEach(el => {
   });
 });
 
-// —— PDF Export ————————————————————————————————————————————————————————————————
+// ── PDF Export ────────────────────────────────────────────────────────────────
 function exportPDF() {
   // Make all tab panes visible for print
   const panes = document.querySelectorAll('.tab-pane');
@@ -4443,12 +4443,12 @@ function exportPDF() {
   }, 1000);
 }
 
-// —— Theme toggle ——————————————————————————————————————————————————————————————
+// ── Theme toggle ──────────────────────────────────────────────────────────────
 function toggleTheme() {
   const isLight = document.documentElement.getAttribute("data-theme") === "light";
   const next = isLight ? "dark" : "light";
   document.documentElement.setAttribute("data-theme", next === "dark" ? "" : "light");
-  document.getElementById("themeBtn").textContent = next === "light" ? "ðŸŒ™ DARK" : "☀ LIGHT";
+  document.getElementById("themeBtn").textContent = next === "light" ? "🌙 DARK" : "☀ LIGHT";
   localStorage.setItem("theme", next);
 }
 // Load saved theme
@@ -4460,19 +4460,19 @@ function toggleTheme() {
   }
 })();
 
-// —— Sector overview ———————————————————————————————————————————————————————————
+// ── Sector overview ───────────────────────────────────────────────────────────
 const SEKTORER = [
-  { navn: "Technology",        etf: "XLK",  ikon: "ðŸ’»", holdings: "AAPL,MSFT,NVDA,AVGO,META,ORCL,CSCO,AMD,ADBE,CRM" },
-  { navn: "Healthcare",        etf: "XLV",  ikon: "ðŸ¥", holdings: "LLY,UNH,JNJ,ABBV,MRK,TMO,ABT,DHR,ISRG,PFE" },
-  { navn: "Financials",        etf: "XLF",  ikon: "ðŸ¦", holdings: "BRK-B,JPM,V,MA,BAC,WFC,GS,MS,SPGI,BLK" },
+  { navn: "Technology",        etf: "XLK",  ikon: "💻", holdings: "AAPL,MSFT,NVDA,AVGO,META,ORCL,CSCO,AMD,ADBE,CRM" },
+  { navn: "Healthcare",        etf: "XLV",  ikon: "🏥", holdings: "LLY,UNH,JNJ,ABBV,MRK,TMO,ABT,DHR,ISRG,PFE" },
+  { navn: "Financials",        etf: "XLF",  ikon: "🏦", holdings: "BRK-B,JPM,V,MA,BAC,WFC,GS,MS,SPGI,BLK" },
   { navn: "Energy",            etf: "XLE",  ikon: "⚡", holdings: "XOM,CVX,COP,EOG,SLB,MPC,PSX,VLO,OXY,HES" },
-  { navn: "Industrials",       etf: "XLI",  ikon: "ðŸ—", holdings: "GE,RTX,CAT,HON,UNP,LMT,DE,ETN,ITW,EMR" },
-  { navn: "Consumer Disc",     etf: "XLY",  ikon: "ðŸ›’", holdings: "AMZN,TSLA,HD,MCD,NKE,LOW,SBUX,TJX,BKNG,CMG" },
-  { navn: "Consumer Staples",  etf: "XLP",  ikon: "ðŸ›", holdings: "PG,KO,PEP,COST,WMT,PM,MDLZ,CL,MO,GIS" },
-  { navn: "Utilities",         etf: "XLU",  ikon: "ðŸ’¡", holdings: "NEE,DUK,SO,D,AEP,EXC,SRE,XEL,PCG,WEC" },
-  { navn: "Real Estate",       etf: "XLRE", ikon: "ðŸ¢", holdings: "PLD,AMT,EQIX,SPG,O,WELL,DLR,PSA,EQR,AVB" },
-  { navn: "Materials",         etf: "XLB",  ikon: "⛏", holdings: "LIN,SHW,APD,FCX,NEM,ECL,DD,ALB,VMC,NUE" },
-  { navn: "Comm Services",     etf: "XLC",  ikon: "ðŸ“¡", holdings: "META,GOOGL,NFLX,DIS,T,VZ,CHTR,EA,MTCH,WBD" },
+  { navn: "Industrials",       etf: "XLI",  ikon: "🏗", holdings: "GE,RTX,CAT,HON,UNP,LMT,DE,ETN,ITW,EMR" },
+  { navn: "Consumer Disc",     etf: "XLY",  ikon: "🛒", holdings: "AMZN,TSLA,HD,MCD,NKE,LOW,SBUX,TJX,BKNG,CMG" },
+  { navn: "Consumer Staples",  etf: "XLP",  ikon: "🛍", holdings: "PG,KO,PEP,COST,WMT,PM,MDLZ,CL,MO,GIS" },
+  { navn: "Utilities",         etf: "XLU",  ikon: "💡", holdings: "NEE,DUK,SO,D,AEP,EXC,SRE,XEL,PCG,WEC" },
+  { navn: "Real Estate",       etf: "XLRE", ikon: "🏢", holdings: "PLD,AMT,EQIX,SPG,O,WELL,DLR,PSA,EQR,AVB" },
+  { navn: "Materials",         etf: "XLB",  ikon: "⛏", holdings: "LIN,SHW,APD,FCX,NEM,ECL,DD,ALB,VMC,NUE" },
+  { navn: "Comm Services",     etf: "XLC",  ikon: "📡", holdings: "META,GOOGL,NFLX,DIS,T,VZ,CHTR,EA,MTCH,WBD" },
 ];
 
 let sektorCache   = null;
