@@ -45,7 +45,7 @@ AI_GUARDRAILS = """
 Use only the supplied data and context.
 If a metric is missing, explicitly say the data is unavailable instead of guessing.
 Do not invent dated catalysts, event schedules, analyst actions, insider motives, or news facts that are not in the input.
-Keep the conclusion proportional to the evidence and say clearly when the signals are mixed.
+Commit to a directional view — mixed signals are normal in markets. Weigh the preponderance of evidence and take a stand. HOLD is a last resort, not a default.
 """.strip()
 
 def cache_get(key):
@@ -437,7 +437,7 @@ def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "maxOutputTokens": maks,
-                "temperature": 0.25,
+                "temperature": 0.5,
                 "thinkingConfig": {"thinkingBudget": 0}
             }
         }
@@ -1493,10 +1493,11 @@ Confidence rules:
 Additional rules:
 {AI_GUARDRAILS}
 - Stay anchored to the supplied data only.
-- If the data is mixed, say it is mixed.
 - If a metric is unavailable, state that it is unavailable instead of inferring it.
 - Do not mention catalysts, schedules, or price levels unless they are explicitly present in the supplied context.
-- Keep the tone professional and concise. Max 340 words.
+- Mixed signals are normal in markets — identify the dominant signal and commit to a directional call. Avoid HOLD unless the evidence is genuinely deadlocked.
+- BUY when the weight of technicals, valuation, and quality metrics favor upside. SELL when multiple risk factors and valuation signals are negative. HOLD only as a last resort when evidence is truly 50/50.
+- Keep the tone sharp, direct, and professional. Max 340 words.
 """
         ai_tekst = spør_ai(prompt, gemini_key, 1500)
         cache_set(cache_key_ai, ai_tekst)
