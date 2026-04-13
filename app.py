@@ -430,23 +430,38 @@ def build_company_snapshot(aksje, info=None, fast_info=None):
 def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
     key = api_key or os.environ.get("GEMINI_API_KEY", "")
     if not key: return "No API key configured."
-    try:
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-        headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "maxOutputTokens": maks,
-                "temperature": 0.5,
-                "thinkingConfig": {"thinkingBudget": 0}
-            }
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": maks,
+            "temperature": 0.5,
+            "thinkingConfig": {"thinkingBudget": 0}
         }
-        r = _requests.post(url, json=payload, headers=headers, timeout=60)
-        r.raise_for_status()
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception as e:
-        logger.error(f"[AI] API error: {e}")
-        return f"AI error: {e}"
+    }
+    last_err = None
+    for attempt in range(4):
+        try:
+            r = _requests.post(url, json=payload, headers=headers, timeout=60)
+            if r.status_code in (429, 500, 503):
+                wait = (2 ** attempt) + 1
+                logger.warning(f"[AI] HTTP {r.status_code} on attempt {attempt+1}, retrying in {wait}s")
+                time.sleep(wait)
+                last_err = f"HTTP {r.status_code}"
+                continue
+            r.raise_for_status()
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except _requests.exceptions.Timeout:
+            wait = (2 ** attempt) + 1
+            logger.warning(f"[AI] Timeout on attempt {attempt+1}, retrying in {wait}s")
+            time.sleep(wait)
+            last_err = "Request timed out"
+        except Exception as e:
+            logger.error(f"[AI] API error: {e}")
+            return f"AI error: {e}"
+    logger.error(f"[AI] All retries exhausted: {last_err}")
+    return "AI unavailable — Gemini is rate limited. Please try again in a moment."
 
 # ── Teknisk analyse ───────────────────────────────────────────────────────────
 
