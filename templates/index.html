@@ -2949,10 +2949,21 @@ async function lastAI(ticker, periode) {
     });
     const data = await res.json();
     if (data.error) {
-      aiPane.innerHTML = `<div class="alert alert-error" style="margin:14px">${data.error}</div>`;
+      aiPane.innerHTML = `<div class="alert alert-error" style="margin:14px">${escapeHtml(data.error)}</div>`;
       return;
     }
     const tekst = data.ai || "No AI analysis available.";
+    const isRateLimited = tekst.toLowerCase().includes("rate limited") || tekst.toLowerCase().includes("unavailable");
+    if (isRateLimited) {
+      aiPane.innerHTML = `<div style="padding:14px">
+        <div class="alert alert-info" style="margin-bottom:14px">
+          Gemini is temporarily rate limited. Wait a few seconds and try again.
+        </div>
+        <button class="btn" onclick="analyseState.loaded.ai=false; analyseState.pending.ai=null; byttTab('ai')"
+          style="width:auto;padding:6px 20px;font-size:10px">↻ RETRY AI ANALYSIS</button>
+      </div>`;
+      return;
+    }
     aiPane.innerHTML = `<div style="padding:14px">${renderAIBlock({
       kicker: "AI Analysis - Gemini 2.5 Flash",
       title: `${ticker} analyst note`,
@@ -2960,7 +2971,12 @@ async function lastAI(ticker, periode) {
       note: "Generated from the metrics and context currently loaded in the app. Treat it as decision support, not as financial advice."
     })}</div>`;
   } catch(e) {
-    aiPane.innerHTML = `<div class="alert alert-error" style="margin:14px">AI analysis failed: ${e.message}</div>`;
+    const isNetwork = e.message && (e.message.includes("fetch") || e.message.includes("network") || e.message.includes("Failed"));
+    aiPane.innerHTML = `<div style="padding:14px">
+      <div class="alert alert-error" style="margin-bottom:14px">${isNetwork ? "Network error — check your connection." : escapeHtml(e.message)}</div>
+      <button class="btn" onclick="analyseState.loaded.ai=false; analyseState.pending.ai=null; byttTab('ai')"
+        style="width:auto;padding:6px 20px;font-size:10px">↻ RETRY AI ANALYSIS</button>
+    </div>`;
   }
 }
 
