@@ -2953,11 +2953,11 @@ async function lastAI(ticker, periode) {
       return;
     }
     const tekst = data.ai || "No AI analysis available.";
-    const isRateLimited = tekst.toLowerCase().includes("rate limited") || tekst.toLowerCase().includes("unavailable");
+    const isRateLimited = tekst.toLowerCase().includes("temporarily unavailable") || tekst.toLowerCase().includes("rate limited") || tekst.toLowerCase().includes("unavailable");
     if (isRateLimited) {
       aiPane.innerHTML = `<div style="padding:14px">
         <div class="alert alert-info" style="margin-bottom:14px">
-          Gemini is temporarily rate limited. Wait a few seconds and try again.
+          AI analysis is temporarily unavailable. Please try again in a moment.
         </div>
         <button class="btn" onclick="analyseState.loaded.ai=false; analyseState.pending.ai=null; byttTab('ai')"
           style="width:auto;padding:6px 20px;font-size:10px">↻ RETRY AI ANALYSIS</button>
@@ -3597,7 +3597,7 @@ function renderMacroDeskChart(values = [], label = "", up = true) {
         <polygon fill="${fill}" points="${areaPoints}"></polygon>
         <polyline fill="none" stroke="${stroke}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${points}"></polyline>
       </svg>
-      <div class="macro-chart-legend">6M history from Yahoo Finance. This replaces the TradingView widget for macro instruments so index charts stay reliable.</div>
+      <div class="macro-chart-legend">6-month historical data · Yahoo Finance</div>
     </div>`;
 }
 
@@ -3738,7 +3738,7 @@ async function kjørSammenlign() {
             <thead><tr>
               <th>TICKER</th><th>PRICE</th><th>MKTCAP</th><th>P/E</th><th>FWD P/E</th>
               <th>ROE</th><th>GROSS MARGIN</th><th>OP. MARGIN</th>
-              <th>UTBYTTE</th><th>TARGET</th><th>CONSENSUS</th>
+              <th>DIVIDEND</th><th>TARGET</th><th>CONSENSUS</th>
             </tr></thead>
             <tbody>${fundamentTabell}</tbody>
           </table>
