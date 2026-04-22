@@ -427,41 +427,57 @@ def build_company_snapshot(aksje, info=None, fast_info=None):
         "ebitda": ebitda,
     }
 
-def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
-    key = api_key or os.environ.get("GEMINI_API_KEY", "")
-    if not key: return "No API key configured."
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+def _call_gemini(prompt: str, key: str, model: str, maks: int) -> str:
+    """Single-model Gemini call with retries. Raises on persistent 429, returns text on success."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": maks,
-            "temperature": 0.5,
-            "thinkingConfig": {"thinkingBudget": 0}
-        }
-    }
-    last_err = None
-    for attempt in range(4):
+    # gemini-2.5-flash supports thinkingConfig; older models do not
+    gen_cfg = {"maxOutputTokens": maks, "temperature": 0.5}
+    if "2.5" in model:
+        gen_cfg["thinkingConfig"] = {"thinkingBudget": 0}
+    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": gen_cfg}
+    last_status = None
+    for attempt in range(3):
         try:
             r = _requests.post(url, json=payload, headers=headers, timeout=60)
-            if r.status_code in (429, 500, 503):
-                wait = (2 ** attempt) + 1
-                logger.warning(f"[AI] HTTP {r.status_code} on attempt {attempt+1}, retrying in {wait}s")
+            if r.status_code == 429:
+                wait = min(4 ** attempt + 2, 30)   # 3s, 18s, 30s
+                logger.warning(f"[AI:{model}] 429 on attempt {attempt+1}, retrying in {wait}s")
                 time.sleep(wait)
-                last_err = f"HTTP {r.status_code}"
+                last_status = 429
+                continue
+            if r.status_code in (500, 503):
+                wait = (2 ** attempt) + 1
+                logger.warning(f"[AI:{model}] HTTP {r.status_code} on attempt {attempt+1}, retrying in {wait}s")
+                time.sleep(wait)
+                last_status = r.status_code
                 continue
             r.raise_for_status()
             return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except _requests.exceptions.Timeout:
-            wait = (2 ** attempt) + 1
-            logger.warning(f"[AI] Timeout on attempt {attempt+1}, retrying in {wait}s")
+            wait = (2 ** attempt) + 2
+            logger.warning(f"[AI:{model}] Timeout on attempt {attempt+1}, retrying in {wait}s")
             time.sleep(wait)
-            last_err = "Request timed out"
+            last_status = "timeout"
+    raise RuntimeError(f"model={model} exhausted retries, last_status={last_status}")
+
+
+def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
+    key = api_key or os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        return "No API key configured."
+    # Try primary model first, fall back to a lighter model on rate-limit failure
+    models = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    for model in models:
+        try:
+            return _call_gemini(prompt, key, model, maks)
+        except RuntimeError as e:
+            logger.warning(f"[AI] Falling back from {model}: {e}")
         except Exception as e:
-            logger.error(f"[AI] API error: {e}")
+            logger.error(f"[AI] Unexpected error with {model}: {e}")
             return f"AI error: {e}"
-    logger.error(f"[AI] All retries exhausted: {last_err}")
-    return "AI unavailable — Gemini is rate limited. Please try again in a moment."
+    logger.error("[AI] All models exhausted.")
+    return "AI analysis is temporarily unavailable. Please try again in a moment."
 
 # ── Teknisk analyse ───────────────────────────────────────────────────────────
 
