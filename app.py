@@ -428,7 +428,7 @@ def build_company_snapshot(aksje, info=None, fast_info=None):
     }
 
 def _call_gemini(prompt: str, key: str, model: str, maks: int) -> str:
-    """Single-model Gemini call with retries. Raises on persistent 429, returns text on success."""
+    """Single-model Gemini call with retries. Raises RuntimeError on failure so callers can fall back."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
     # gemini-2.5-flash supports thinkingConfig; older models do not
@@ -452,13 +452,23 @@ def _call_gemini(prompt: str, key: str, model: str, maks: int) -> str:
                 time.sleep(wait)
                 last_status = r.status_code
                 continue
+            # 404 means the model name is not found — no point retrying, signal fallback immediately
+            if r.status_code == 404:
+                raise RuntimeError(f"model={model} not found (404) — skipping to fallback")
             r.raise_for_status()
             return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except RuntimeError:
+            raise  # propagate 404-not-found signal directly
         except _requests.exceptions.Timeout:
             wait = (2 ** attempt) + 2
             logger.warning(f"[AI:{model}] Timeout on attempt {attempt+1}, retrying in {wait}s")
             time.sleep(wait)
             last_status = "timeout"
+        except Exception as e:
+            # Treat any other unexpected HTTP/network error as a retryable failure
+            logger.warning(f"[AI:{model}] Unexpected error on attempt {attempt+1}: {e}")
+            last_status = str(e)
+            time.sleep((2 ** attempt) + 1)
     raise RuntimeError(f"model={model} exhausted retries, last_status={last_status}")
 
 
@@ -466,17 +476,19 @@ def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
     key = api_key or os.environ.get("GEMINI_API_KEY", "")
     if not key:
         return "No API key configured."
-    # Try primary model first, fall back to a lighter model on rate-limit failure
-    models = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    # Try models in order; fall back to the next on any failure
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    last_error = None
     for model in models:
         try:
             return _call_gemini(prompt, key, model, maks)
         except RuntimeError as e:
+            last_error = e
             logger.warning(f"[AI] Falling back from {model}: {e}")
         except Exception as e:
+            last_error = e
             logger.error(f"[AI] Unexpected error with {model}: {e}")
-            return f"AI error: {e}"
-    logger.error("[AI] All models exhausted.")
+    logger.error(f"[AI] All models exhausted. Last error: {last_error}")
     return "AI analysis is temporarily unavailable. Please try again in a moment."
 
 # ── Teknisk analyse ───────────────────────────────────────────────────────────
