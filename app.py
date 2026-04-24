@@ -477,7 +477,7 @@ def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
     if not key:
         return "No API key configured."
     # Try models in order; fall back to the next on any failure
-    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
     last_error = None
     for model in models:
         try:
@@ -489,7 +489,7 @@ def spør_ai(prompt: str, api_key: str, maks=1200) -> str:
             last_error = e
             logger.error(f"[AI] Unexpected error with {model}: {e}")
     logger.error(f"[AI] All models exhausted. Last error: {last_error}")
-    return "AI analysis is temporarily unavailable. Please try again in a moment."
+    return f"AI analysis unavailable — all models failed. Last error: {last_error}"
 
 # ── Teknisk analyse ───────────────────────────────────────────────────────────
 
@@ -2586,6 +2586,38 @@ def api_watchlist_kurs():
             resultat[futures[future]] = future.result()
 
     return safe_jsonify([r for r in resultat if r is not None])
+
+
+@app.route("/api/ai_status", methods=["GET"])
+def api_ai_status():
+    """Diagnostic endpoint: tests each Gemini model and reports the outcome."""
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        return safe_jsonify({"error": "GEMINI_API_KEY is not set", "key_set": False})
+
+    # First, list available models so we know what the key can access
+    models_to_test = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    results = {}
+    for model in models_to_test:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        payload = {"contents": [{"parts": [{"text": "Say OK"}]}], "generationConfig": {"maxOutputTokens": 5}}
+        try:
+            r = _requests.post(url, json=payload, headers={"x-goog-api-key": key, "Content-Type": "application/json"}, timeout=15)
+            if r.status_code == 200:
+                results[model] = "OK"
+            else:
+                results[model] = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            results[model] = f"Exception: {str(e)[:200]}"
+
+    working = [m for m, s in results.items() if s == "OK"]
+    return safe_jsonify({
+        "key_set": True,
+        "key_prefix": key[:8] + "...",
+        "models": results,
+        "working_models": working,
+        "recommendation": working[0] if working else "No working models found — check your API key at https://aistudio.google.com/",
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
